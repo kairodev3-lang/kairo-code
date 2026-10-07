@@ -416,6 +416,19 @@ body.no-nav .bottom-nav{display:none}
   </div>
 </div>
 
+<!-- GENERIC DIALOG (replaces confirm/prompt) -->
+<div class="modal-bg" id="dlgModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="dlgTitle">Confirm</h2>
+      <button class="close-modal" id="dlgClose" aria-label="Close">×</button>
+    </div>
+    <p id="dlgMsg" style="color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:14px;display:none"></p>
+    <input class="input" id="dlgInput" style="display:none" autocomplete="off">
+    <button class="modal-create" id="dlgOk">OK</button>
+  </div>
+</div>
+
 <div class="toast" id="toast">Saved</div>
 
 <script>
@@ -577,6 +590,31 @@ if("serviceWorker" in navigator && location.protocol === "https:"){
     window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
 }
 
+/* ---------- in-app dialog (no browser "page says" popups) ---------- */
+let dlgCb = null;
+function dlg(opt, cb){
+    $("dlgTitle").textContent = opt.title || "Confirm";
+    const m = $("dlgMsg");
+    m.textContent = opt.msg || "";
+    m.style.display = opt.msg ? "block" : "none";
+    const i = $("dlgInput");
+    i.style.display = opt.input ? "block" : "none";
+    i.value = "";
+    i.placeholder = opt.input || "";
+    $("dlgOk").textContent = opt.ok || "OK";
+    dlgCb = cb;
+    $("dlgModal").classList.add("show");
+    if(opt.input) setTimeout(() => i.focus(), 60);
+}
+function dlgDone(ok){
+    $("dlgModal").classList.remove("show");
+    const cb = dlgCb; dlgCb = null;
+    if(ok && cb) cb($("dlgInput").value.trim());
+}
+$("dlgOk").addEventListener("click", () => dlgDone(true));
+$("dlgClose").addEventListener("click", () => dlgDone(false));
+$("dlgInput").addEventListener("keydown", e => { if(e.key === "Enter") dlgDone(true); });
+
 /* ---------- navigation ---------- */
 const pages = document.querySelectorAll(".page");
 const navButtons = document.querySelectorAll(".nav-btn[data-page]");
@@ -606,12 +644,14 @@ function createProjectObject(name, template){
 
 function deleteProject(id){
     const p = projects.find(x => x.id === id);
-    if(!p || !confirm('Delete "' + p.name + '" and all its files?')) return;
-    projects = projects.filter(x => x.id !== id);
-    if(currentProject && currentProject.id === id) currentProject = null;
-    persist();
-    renderProjects();
-    showToast("Project deleted");
+    if(!p) return;
+    dlg({title:"Delete project?", msg:'Delete "' + p.name + '" and all its files?', ok:"Delete"}, () => {
+        projects = projects.filter(x => x.id !== id);
+        if(currentProject && currentProject.id === id) currentProject = null;
+        persist();
+        renderProjects();
+        showToast("Project deleted");
+    });
 }
 
 function renderProjects(){
@@ -803,11 +843,12 @@ $("copyCode").addEventListener("click", async () => {
 });
 
 $("clearCode").addEventListener("click", () => {
-    if(!confirm("Clear this file?")) return;
-    codeEditor.value = "";
-    onEdit();
-    saveCurrentFile();
-    showToast("File cleared");
+    dlg({title:"Clear file?", msg:"All code in this file will be erased.", ok:"Clear"}, () => {
+        codeEditor.value = "";
+        onEdit();
+        saveCurrentFile();
+        showToast("File cleared");
+    });
 });
 
 $("deleteFile").addEventListener("click", () => {
@@ -817,13 +858,14 @@ $("deleteFile").addEventListener("click", () => {
         showToast("Keep at least one file");
         return;
     }
-    if(!confirm('Delete "' + currentFile + '"?')) return;
-    delete currentProject.files[currentFile];
-    persist();
-    currentFile = Object.keys(currentProject.files)[0];
-    renderFileTabs();
-    loadCurrentFile();
-    showToast("File deleted");
+    dlg({title:"Delete file?", msg:'Delete "' + currentFile + '"?', ok:"Delete"}, () => {
+        delete currentProject.files[currentFile];
+        persist();
+        currentFile = Object.keys(currentProject.files)[0];
+        renderFileTabs();
+        loadCurrentFile();
+        showToast("File deleted");
+    });
 });
 
 /* ---------- new file ---------- */
@@ -1084,11 +1126,12 @@ $("filesHeroBtn").addEventListener("click", () => showPage("filesPage"));
 
 $("searchBtn").addEventListener("click", () => {
     if(!projects.length){ showToast("No projects found"); return; }
-    const q = prompt("Search project:");
-    if(!q) return;
-    const result = projects.find(p => p.name.toLowerCase().includes(q.toLowerCase()));
-    if(result) openProject(result.id);
-    else showToast("Project not found");
+    dlg({title:"Search project", input:"Project name", ok:"Search"}, q => {
+        if(!q) return;
+        const result = projects.find(p => p.name.toLowerCase().includes(q.toLowerCase()));
+        if(result) openProject(result.id);
+        else showToast("Project not found");
+    });
 });
 
 /* close modals by tapping the dark background */
