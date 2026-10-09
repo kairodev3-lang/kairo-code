@@ -1,4 +1,3 @@
-
 name: Build APK
 run-name: build-${{ inputs.id }}
 
@@ -184,19 +183,28 @@ jobs:
           }
           EOF
 
-      - name: Make icons
+      - name: Make icon
         run: |
           set -euo pipefail
           cd proj
+          D=app/src/main/res/mipmap-xxxhdpi
+          mkdir -p "$D"
           rm -f icon.png
           if [ -n "$IN_ICON" ]; then printf '%s' "$IN_ICON" | base64 -d > icon.png 2>/dev/null || rm -f icon.png; fi
-          if [ -f icon.png ] && ! identify icon.png >/dev/null 2>&1; then rm -f icon.png; fi
-          for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
-            dir="app/src/main/res/mipmap-${d%%:*}"; sz="${d##*:}"
-            mkdir -p "$dir"
-            if [ -f icon.png ]; then convert icon.png -resize "${sz}x${sz}!" "$dir/ic_launcher.png"
-            else convert -size "${sz}x${sz}" 'xc:#8b5cf6' "$dir/ic_launcher.png"; fi
-          done
+          if [ -f icon.png ] && [ "$(head -c 4 icon.png | tail -c 3)" = "PNG" ]; then
+            cp icon.png "$D/ic_launcher.png"
+          else
+            python3 - "$D/ic_launcher.png" <<'PY'
+          import sys, zlib, struct
+          w = h = 96
+          raw = b"".join(b"\x00" + bytes([139, 92, 246, 255]) * w for _ in range(h))
+          def ch(t, d):
+              c = struct.pack(">I", len(d)) + t + d
+              return c + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+          png = b"\x89PNG\r\n\x1a\n" + ch(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)) + ch(b"IDAT", zlib.compress(raw)) + ch(b"IEND", b"")
+          open(sys.argv[1], "wb").write(png)
+          PY
+          fi
 
       - name: Keystore
         run: |
