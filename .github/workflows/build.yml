@@ -1,1 +1,421 @@
 
+name: Build APK
+run-name: build-${{ inputs.id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      id:
+        description: Build id
+        required: true
+      url:
+        description: Site URL
+        required: true
+      name:
+        description: App name
+        required: true
+      pkg:
+        description: Package name
+        required: true
+      icon:
+        description: Icon PNG base64
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      IN_ID: ${{ inputs.id }}
+      IN_URL: ${{ inputs.url }}
+      IN_NAME: ${{ inputs.name }}
+      IN_PKG: ${{ inputs.pkg }}
+      IN_ICON: ${{ inputs.icon }}
+      KS_B64: ${{ secrets.KEYSTORE_B64 }}
+      KS_PASS_SECRET: ${{ secrets.KEYSTORE_PASS }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+          grep -Eq '^[a-z0-9]{6,20}$' <<<"$IN_ID" || { echo "Bad id"; exit 1; }
+          grep -Eq '^https://[A-Za-z0-9._~:/?#@!$&()*+,;=%-]+$' <<<"$IN_URL" || { echo "Bad URL"; exit 1; }
+          [ "${#IN_URL}" -le 300 ] || { echo "URL too long"; exit 1; }
+          grep -Eq '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$' <<<"$IN_PKG" || { echo "Bad package"; exit 1; }
+          NAME=$(printf '%s' "$IN_NAME" | tr -cd 'A-Za-z0-9 ._-' | cut -c1-30)
+          [ -n "$NAME" ] || NAME=App
+          SLUG=$(printf '%s' "$NAME" | tr 'A-Z ' 'a-z-' | tr -cd 'a-z0-9-')
+          [ -n "$SLUG" ] || SLUG=app
+          echo "NAME=$NAME" >> "$GITHUB_ENV"
+          echo "SLUG=$SLUG" >> "$GITHUB_ENV"
+
+      - name: Create Android project
+        run: |
+          set -euo pipefail
+          mkdir -p proj/app/src/main/java/com/kairo/wrapper
+          cd proj
+          cat > settings.gradle <<'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositories { google(); mavenCentral() } }
+          rootProject.name = "app"
+          include ":app"
+          EOF
+          cat > build.gradle <<'EOF'
+          plugins { id 'com.android.application' version '8.5.2' apply false }
+          EOF
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2g
+          android.useAndroidX=false
+          EOF
+          cat > app/build.gradle <<'EOF'
+          plugins { id 'com.android.application' }
+          android {
+            namespace 'com.kairo.wrapper'
+            compileSdk 34
+            defaultConfig {
+              applicationId project.property('APP_ID')
+              minSdk 23
+              targetSdk 34
+              versionCode 1
+              versionName '1.0.0'
+              buildConfigField 'String', 'START_URL', '"' + project.property('APP_URL') + '"'
+              resValue 'string', 'app_name', project.property('APP_NAME')
+            }
+            buildFeatures { buildConfig true }
+            signingConfigs {
+              release {
+                storeFile file(System.getenv('KS_FILE'))
+                storePassword System.getenv('KS_PASS')
+                keyAlias 'kairo'
+                keyPassword System.getenv('KS_PASS')
+              }
+            }
+            buildTypes { release { minifyEnabled false; signingConfig signingConfigs.release } }
+            lint { checkReleaseBuilds false; abortOnError false }
+            compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+          }
+          EOF
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.INTERNET"/>
+            <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+            <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+            <uses-permission android:name="android.permission.CAMERA"/>
+            <uses-feature android:name="android.hardware.camera" android:required="false"/>
+            <uses-feature android:name="android.hardware.microphone" android:required="false"/>
+            <application
+              android:label="@string/app_name"
+              android:icon="@mipmap/ic_launcher"
+              android:allowBackup="false"
+              android:usesCleartextTraffic="false"
+              android:theme="@style/AppTheme">
+              <activity
+                android:name="com.kairo.wrapper.MainActivity"
+                android:exported="true"
+                android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
+                android:windowSoftInputMode="adjustResize">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          EOF
+          cat > app/src/main/java/com/kairo/wrapper/MainActivity.java <<'EOF'
+          package com.kairo.wrapper;
+
+          import android.Manifest;
+          import android.app.Activity;
+          import android.app.DownloadManager;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.graphics.Color;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.os.Environment;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.view.View;
+          import android.webkit.CookieManager;
+          import android.webkit.PermissionRequest;
+          import android.webkit.URLUtil;
+          import android.webkit.ValueCallback;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebResourceError;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.widget.FrameLayout;
+          import android.widget.ImageView;
+          import android.widget.Toast;
+          import java.util.ArrayList;
+
+          public class MainActivity extends Activity {
+            static final int REQ_FILE = 1001, REQ_PERM = 1002;
+            final String home = BuildConfig.START_URL;
+            WebView web;
+            ImageView splash;
+            ValueCallback<Uri[]> filePathCb;
+            PermissionRequest pendingReq;
+
+            void openExternal(Uri u) {
+              try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception ignored) {}
+            }
+
+            void hideSplash() {
+              if (splash == null || splash.getVisibility() != View.VISIBLE) return;
+              splash.animate().alpha(0f).setDuration(180).withEndAction(() -> splash.setVisibility(View.GONE)).start();
+            }
+
+            void download(String u, String ua, String cd, String mt) {
+              if (!u.startsWith("http")) { Toast.makeText(this, "This download is not supported", Toast.LENGTH_SHORT).show(); return; }
+              try {
+                DownloadManager.Request rq = new DownloadManager.Request(Uri.parse(u));
+                rq.setMimeType(mt);
+                rq.addRequestHeader("User-Agent", ua);
+                String ck = CookieManager.getInstance().getCookie(u);
+                if (ck != null) rq.addRequestHeader("Cookie", ck);
+                rq.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                rq.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(u, cd, mt));
+                ((DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(rq);
+                Toast.makeText(this, "Downloading...", Toast.LENGTH_SHORT).show();
+              } catch (Exception e) {
+                openExternal(Uri.parse(u));
+              }
+            }
+
+            @Override protected void onCreate(Bundle b) {
+              super.onCreate(b);
+              getWindow().setStatusBarColor(Color.BLACK);
+              getWindow().setNavigationBarColor(Color.BLACK);
+
+              FrameLayout root = new FrameLayout(this);
+              root.setBackgroundColor(Color.BLACK);
+
+              web = new WebView(this);
+              web.setBackgroundColor(Color.BLACK);
+              root.addView(web, new FrameLayout.LayoutParams(-1, -1));
+
+              splash = new ImageView(this);
+              splash.setBackgroundColor(Color.BLACK);
+              splash.setImageResource(R.drawable.ic_fg);
+              splash.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+              int p = (int) (getResources().getDisplayMetrics().widthPixels * 0.34f);
+              splash.setPadding(p, p, p, p);
+              root.addView(splash, new FrameLayout.LayoutParams(-1, -1));
+              setContentView(root);
+
+              WebSettings s = web.getSettings();
+              s.setJavaScriptEnabled(true);
+              s.setDomStorageEnabled(true);
+              s.setCacheMode(WebSettings.LOAD_DEFAULT);
+              s.setMediaPlaybackRequiresUserGesture(false);
+              s.setAllowFileAccess(true);
+              s.setJavaScriptCanOpenWindowsAutomatically(true);
+              CookieManager cm = CookieManager.getInstance();
+              cm.setAcceptCookie(true);
+              cm.setAcceptThirdPartyCookies(web, true);
+
+              web.setDownloadListener((u, ua, cd, mt, len) -> download(u, ua, cd, mt));
+
+              web.setWebChromeClient(new WebChromeClient() {
+                @Override public void onProgressChanged(WebView v, int progress) {
+                  if (progress >= 75) hideSplash();
+                }
+
+                @Override public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb, FileChooserParams params) {
+                  if (filePathCb != null) filePathCb.onReceiveValue(null);
+                  filePathCb = cb;
+                  try {
+                    startActivityForResult(params.createIntent(), REQ_FILE);
+                  } catch (Exception e) {
+                    filePathCb = null;
+                    return false;
+                  }
+                  return true;
+                }
+
+                @Override public void onPermissionRequest(final PermissionRequest request) {
+                  runOnUiThread(() -> {
+                    String host = Uri.parse(home).getHost();
+                    if (host == null || !host.equals(request.getOrigin().getHost())) { request.deny(); return; }
+                    ArrayList<String> need = new ArrayList<>();
+                    for (String r : request.getResources()) {
+                      if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r) && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) need.add(Manifest.permission.RECORD_AUDIO);
+                      if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r) && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) need.add(Manifest.permission.CAMERA);
+                    }
+                    if (need.isEmpty()) {
+                      request.grant(request.getResources());
+                    } else {
+                      pendingReq = request;
+                      requestPermissions(need.toArray(new String[0]), REQ_PERM);
+                    }
+                  });
+                }
+              });
+
+              web.setWebViewClient(new WebViewClient() {
+                @Override public void onPageFinished(WebView v, String url) { hideSplash(); }
+                @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
+                  Uri u = r.getUrl();
+                  String sc = u.getScheme();
+                  if (sc == null || sc.equals("http") || sc.equals("https") || sc.equals("about") || sc.equals("blob") || sc.equals("data") || sc.equals("javascript")) return false;
+                  if (sc.equals("intent")) {
+                    try { startActivity(Intent.parseUri(u.toString(), Intent.URI_INTENT_SCHEME)); } catch (Exception ignored) {}
+                    return true;
+                  }
+                  openExternal(u);
+                  return true;
+                }
+                @Override public void onReceivedError(WebView v, WebResourceRequest r, WebResourceError e) {
+                  if (r.isForMainFrame()) {
+                    hideSplash();
+                    v.loadData("<body style='font-family:sans-serif;text-align:center;padding:40px;background:#000;color:#eee'><h2>No connection</h2><p>Check your internet and try again.</p><button onclick=\"location.href='" + home + "'\">Retry</button></body>", "text/html", "UTF-8");
+                  }
+                }
+              });
+
+              new Handler(Looper.getMainLooper()).postDelayed(this::hideSplash, 5000);
+              web.loadUrl(home);
+            }
+
+            @Override protected void onActivityResult(int req, int res, Intent data) {
+              if (req == REQ_FILE) {
+                if (filePathCb != null) {
+                  filePathCb.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res, data));
+                  filePathCb = null;
+                }
+                return;
+              }
+              super.onActivityResult(req, res, data);
+            }
+
+            @Override public void onRequestPermissionsResult(int code, String[] perms, int[] results) {
+              if (code == REQ_PERM && pendingReq != null) {
+                boolean ok = results.length > 0;
+                for (int r : results) if (r != PackageManager.PERMISSION_GRANTED) ok = false;
+                if (ok) pendingReq.grant(pendingReq.getResources()); else pendingReq.deny();
+                pendingReq = null;
+                return;
+              }
+              super.onRequestPermissionsResult(code, perms, results);
+            }
+
+            @Override public void onBackPressed() {
+              if (web.canGoBack()) web.goBack(); else super.onBackPressed();
+            }
+          }
+          EOF
+
+      - name: Make icon and theme
+        run: |
+          set -euo pipefail
+          cd proj
+          R=app/src/main/res
+          mkdir -p "$R/drawable-nodpi" "$R/mipmap-xxxhdpi" "$R/mipmap-anydpi-v26" "$R/drawable" "$R/values" "$R/values-v31"
+          rm -f icon.bin
+          EXT=png
+          if [ -n "$IN_ICON" ]; then printf '%s' "$IN_ICON" | base64 -d > icon.bin 2>/dev/null || rm -f icon.bin; fi
+          if [ -f icon.bin ]; then
+            if [ "$(head -c 4 icon.bin | tail -c 3)" = "PNG" ]; then EXT=png
+            elif [ "$(head -c 4 icon.bin)" = "RIFF" ] && [ "$(head -c 12 icon.bin | tail -c 4)" = "WEBP" ]; then EXT=webp
+            else rm -f icon.bin; fi
+          fi
+          if [ ! -f icon.bin ]; then
+            EXT=png
+            python3 - icon.bin <<'PY'
+          import sys, zlib, struct
+          w = h = 192
+          raw = b"".join(b"\x00" + bytes([139, 92, 246, 255]) * w for _ in range(h))
+          def ch(t, d):
+              c = struct.pack(">I", len(d)) + t + d
+              return c + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+          png = b"\x89PNG\r\n\x1a\n" + ch(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)) + ch(b"IDAT", zlib.compress(raw)) + ch(b"IEND", b"")
+          open(sys.argv[1], "wb").write(png)
+          PY
+          fi
+          cp icon.bin "$R/drawable-nodpi/ic_fg.$EXT"
+          cp icon.bin "$R/mipmap-xxxhdpi/ic_launcher.$EXT"
+          cat > "$R/mipmap-anydpi-v26/ic_launcher.xml" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+            <background android:drawable="@android:color/black"/>
+            <foreground>
+              <inset android:drawable="@drawable/ic_fg" android:insetLeft="14%" android:insetTop="14%" android:insetRight="14%" android:insetBottom="14%"/>
+            </foreground>
+          </adaptive-icon>
+          EOF
+          cat > "$R/drawable/splash_bg.xml" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+            <item android:drawable="@android:color/black"/>
+            <item android:gravity="center" android:width="96dp" android:height="96dp">
+              <bitmap android:src="@drawable/ic_fg" android:gravity="fill"/>
+            </item>
+          </layer-list>
+          EOF
+          cat > "$R/values/styles.xml" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+            <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
+              <item name="android:statusBarColor">#000000</item>
+              <item name="android:navigationBarColor">#000000</item>
+              <item name="android:windowBackground">@drawable/splash_bg</item>
+            </style>
+          </resources>
+          EOF
+          cat > "$R/values-v31/styles.xml" <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+            <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
+              <item name="android:statusBarColor">#000000</item>
+              <item name="android:navigationBarColor">#000000</item>
+              <item name="android:windowBackground">@android:color/black</item>
+              <item name="android:windowSplashScreenBackground">#000000</item>
+              <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+            </style>
+          </resources>
+          EOF
+
+      - name: Keystore
+        run: |
+          set -euo pipefail
+          if [ -n "$KS_B64" ] && [ -n "$KS_PASS_SECRET" ]; then
+            PASS="$KS_PASS_SECRET"
+            echo "::add-mask::$PASS"
+            printf '%s' "$KS_B64" | base64 -d > "$RUNNER_TEMP/ks.jks"
+          else
+            PASS=$(openssl rand -hex 12)
+            echo "::add-mask::$PASS"
+            keytool -genkeypair -keystore "$RUNNER_TEMP/ks.jks" -storepass "$PASS" -keypass "$PASS" -alias kairo -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=KAIRO DEV" >/dev/null 2>&1
+          fi
+          echo "KS_FILE=$RUNNER_TEMP/ks.jks" >> "$GITHUB_ENV"
+          echo "KS_PASS=$PASS" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        working-directory: proj
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
+          gradle assembleRelease --no-daemon -PAPP_ID="$IN_PKG" -PAPP_NAME="$NAME" -PAPP_URL="$IN_URL"
+
+      - name: Publish APK
+        run: |
+          set -euo pipefail
+          cp proj/app/build/outputs/apk/release/app-release.apk "$SLUG.apk"
+          gh release create "build-$IN_ID" "$SLUG.apk" --repo "$GITHUB_REPOSITORY" --title "$NAME" --notes "$IN_PKG"
