@@ -14,6 +14,16 @@ module.exports = async function handler(req, res) {
   const u = new URL(url);
   const site = u.origin;
 
+  for (const f of ["/icon-512.png", "/icon-maskable-512.png", "/manifest.webmanifest"]) {
+    try {
+      const c = await fetch(site + f);
+      if (c.body) c.body.cancel();
+      if (!c.ok) return res.status(400).send("Missing " + f + " on " + site + " (upload it to the ROOT of that site's repo, deploy, then try again)");
+    } catch (e) {
+      return res.status(400).send("Cannot reach " + site + f);
+    }
+  }
+
   const options = {
     packageId,
     name,
