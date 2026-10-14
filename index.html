@@ -377,6 +377,17 @@ html,body{overscroll-behavior:none}
     <p id="buildMsg" style="font-size:12px;color:#aeb9ca;margin-top:8px;line-height:1.5"></p>
     <button class="modal-create" id="appDownload" style="display:none;margin-top:10px">⬇ Download my app</button>
   </div>
+  <div id="linkBox" style="display:none;margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:15px;background:var(--card)">
+    <strong style="font-size:13px">Hide the address bar</strong>
+    <p style="font-size:11px;color:#aeb9ca;line-height:1.6;margin:8px 0 10px">Chrome shows your website link at the top until your site proves it owns the app. Put the file below at <b>your-site/.well-known/assetlinks.json</b> (create a folder named <b>.well-known</b> at the root of your site's repo), deploy, then uninstall and reinstall the app.</p>
+    <textarea class="input" id="linkText" readonly style="height:130px;resize:none;font:11px/1.5 'Courier New',monospace;white-space:pre"></textarea>
+    <div style="display:flex;gap:8px">
+      <button class="secondary-btn" id="linkCopy" style="flex:1">Copy</button>
+      <button class="secondary-btn" id="linkDownload" style="flex:1">⬇ File</button>
+      <button class="secondary-btn" id="linkCheck" style="flex:1">Check my site</button>
+    </div>
+    <p id="linkMsg" style="font-size:11px;color:#aeb9ca;line-height:1.6;margin-top:10px"></p>
+  </div>
 
   <p style="font-size:11px;color:#8993a3;line-height:1.6;margin-top:10px">Your icon is uploaded automatically when you tap "Generate my app". There is nothing to upload by hand.</p>
 </section>
@@ -1040,41 +1051,69 @@ function drawCover(g, img, x, y, w, h){
     g.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
 }
 
+let appIconInfo = null;
+
+/* find the real picture inside the photo (remove dark/transparent margins) and sample its edge colors */
+function analyzeIcon(img){
+    const N = 64;
+    const c = document.createElement("canvas");
+    c.width = c.height = N;
+    const g = c.getContext("2d", { willReadFrequently:true });
+    g.drawImage(img, 0, 0, N, N);
+    const d = g.getImageData(0, 0, N, N).data;
+    const px = (x, y) => { const i = (y * N + x) * 4; return [d[i], d[i+1], d[i+2], d[i+3]]; };
+    const bg = px(0, 0);
+    const diff = (a, b) => Math.abs(a[0]-b[0]) + Math.abs(a[1]-b[1]) + Math.abs(a[2]-b[2]);
+    let x0 = N, y0 = N, x1 = -1, y1 = -1;
+    for(let y = 0; y < N; y++){
+        for(let x = 0; x < N; x++){
+            const p = px(x, y);
+            const solid = bg[3] < 20 ? p[3] > 20 : (p[3] > 20 && diff(p, bg) > 60);
+            if(solid){ if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y; }
+        }
+    }
+    if(x1 < 0){ x0 = 0; y0 = 0; x1 = N - 1; y1 = N - 1; }
+    const k = img.width / N, kh = img.height / N;
+    let w = (x1 - x0 + 1) * k, h = (y1 - y0 + 1) * kh;
+    const side = Math.min(Math.max(w, h), Math.min(img.width, img.height));
+    const inset = side * 0.07;
+    let sx = x0 * k + w / 2 - side / 2 + inset;
+    let sy = y0 * kh + h / 2 - side / 2 + inset;
+    const sw = side - 2 * inset;
+    sx = Math.max(0, Math.min(img.width - sw, sx));
+    sy = Math.max(0, Math.min(img.height - sw, sy));
+    const m = Math.max(2, Math.round(N * 0.06));
+    const col = p => "rgb(" + p[0] + "," + p[1] + "," + p[2] + ")";
+    return {
+        sx:sx, sy:sy, sw:sw,
+        c1: col(px(Math.min(N-1, x0 + m), Math.min(N-1, y0 + m))),
+        c2: col(px(Math.max(0, x1 - m), Math.max(0, y1 - m)))
+    };
+}
+
 function renderIcon(size, maskable, letter, color){
     const c = document.createElement("canvas");
     c.width = c.height = size;
     const g = c.getContext("2d");
     const grad = g.createLinearGradient(0, 0, size, size);
-    grad.addColorStop(0, color);
-    grad.addColorStop(1, "#7c3aed");
 
-    if(appIconImg){
-        if(maskable){
-            g.fillStyle = grad;
-            g.fillRect(0, 0, size, size);
-            const m = size * 0.15;
-            drawCover(g, appIconImg, m, m, size - 2 * m, size - 2 * m);
-        }else{
-            g.save();
-            g.beginPath();
-            g.roundRect(0, 0, size, size, size * 0.22);
-            g.clip();
-            drawCover(g, appIconImg, 0, 0, size, size);
-            g.restore();
-        }
-    }else{
+    if(appIconImg && appIconInfo){
+        grad.addColorStop(0, appIconInfo.c1);
+        grad.addColorStop(1, appIconInfo.c2);
         g.fillStyle = grad;
-        if(maskable){
-            g.fillRect(0, 0, size, size);
-        }else{
-            g.beginPath();
-            g.roundRect(0, 0, size, size, size * 0.22);
-            g.fill();
-        }
+        g.fillRect(0, 0, size, size);
+        const scale = maskable ? 0.7 : 0.8;
+        const w = size * scale, o = (size - w) / 2;
+        g.drawImage(appIconImg, appIconInfo.sx, appIconInfo.sy, appIconInfo.sw, appIconInfo.sw, o, o, w, w);
+    }else{
+        grad.addColorStop(0, color);
+        grad.addColorStop(1, "#7c3aed");
+        g.fillStyle = grad;
+        g.fillRect(0, 0, size, size);
         g.fillStyle = "#fff";
         g.textAlign = "center";
         g.textBaseline = "middle";
-        g.font = "900 " + Math.round(size * (maskable ? 0.42 : 0.55)) + "px Arial, sans-serif";
+        g.font = "900 " + Math.round(size * (maskable ? 0.4 : 0.5)) + "px Arial, sans-serif";
         g.fillText(letter, size / 2, size / 2 + size * 0.03);
     }
     return c.toDataURL("image/png");
@@ -1091,6 +1130,7 @@ $("appIconFile").addEventListener("change", e => {
         const img = new Image();
         img.onload = () => {
             appIconImg = img;
+            appIconInfo = analyzeIcon(img);
             const prev = $("iconPreview");
             prev.style.backgroundImage = "url(" + reader.result + ")";
             prev.textContent = "";
@@ -1106,6 +1146,7 @@ $("appIconFile").addEventListener("change", e => {
 
 $("clearIcon").addEventListener("click", () => {
     appIconImg = null;
+    appIconInfo = null;
     const prev = $("iconPreview");
     prev.style.backgroundImage = "none";
     prev.textContent = "🖼";
@@ -1122,6 +1163,7 @@ $("appMake").addEventListener("click", async () => {
     const btn = $("appMake"), bar = $("buildBar"), msg = $("buildMsg"), dl = $("appDownload");
     btn.disabled = true; btn.style.opacity = ".6";
     dl.style.display = "none";
+    $("linkBox").style.display = "none";
     $("buildBox").style.display = "block";
     bar.style.width = "0";
 
@@ -1148,6 +1190,7 @@ $("appMake").addEventListener("click", async () => {
         if(!r.ok) throw new Error((await r.text()).slice(0, 250));
         const blob = await r.blob();
         const href = URL.createObjectURL(blob);
+        showLinkBox(blob, v.url, pkg);
         clearInterval(timer);
         bar.style.width = "100%";
         msg.textContent = "Your app is ready ✓ (zip with the APK inside). Keep the signing key from the zip for updates.";
@@ -1163,6 +1206,76 @@ $("appMake").addEventListener("click", async () => {
         msg.textContent = "Build failed: " + e.message;
     }
     btn.disabled = false; btn.style.opacity = "1";
+});
+
+/* ---------- read assetlinks.json from the built zip ---------- */
+async function zipRead(blob, suffix){
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    const dv = new DataView(buf.buffer);
+    let e = buf.length - 22;
+    while(e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+    if(e < 0) return null;
+    const count = dv.getUint16(e + 10, true);
+    let p = dv.getUint32(e + 16, true);
+    const td = new TextDecoder();
+    for(let i = 0; i < count; i++){
+        if(dv.getUint32(p, true) !== 0x02014b50) break;
+        const method = dv.getUint16(p + 10, true);
+        const csize = dv.getUint32(p + 20, true);
+        const nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+        const off = dv.getUint32(p + 42, true);
+        const name = td.decode(buf.subarray(p + 46, p + 46 + nl));
+        if(name.toLowerCase().endsWith(suffix)){
+            const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+            const data = buf.subarray(start, start + csize);
+            if(method === 0) return td.decode(data);
+            const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+            return await new Response(stream).text();
+        }
+        p += 46 + nl + el + cl;
+    }
+    return null;
+}
+
+let lastBuild = null;
+
+async function showLinkBox(blob, siteUrl, pkg){
+    lastBuild = { url:siteUrl, pkg:pkg };
+    let text = null;
+    try{ text = await zipRead(blob, "assetlinks.json"); }catch(e){}
+    $("linkText").value = text || "";
+    $("linkMsg").textContent = text ? "" : "Could not read assetlinks.json from the zip. Open the zip and use the assetlinks.json file inside it.";
+    $("linkBox").style.display = "block";
+}
+
+$("linkCopy").addEventListener("click", async () => {
+    const t = $("linkText");
+    if(!t.value){ showToast("Nothing to copy"); return; }
+    try{ await navigator.clipboard.writeText(t.value); }
+    catch(e){ t.select(); document.execCommand("copy"); }
+    showToast("Copied");
+});
+
+$("linkDownload").addEventListener("click", () => {
+    const t = $("linkText").value;
+    if(!t){ showToast("Nothing to download"); return; }
+    const url = URL.createObjectURL(new Blob([t], { type:"application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "assetlinks.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+$("linkCheck").addEventListener("click", async () => {
+    if(!lastBuild){ showToast("Generate your app first"); return; }
+    $("linkMsg").textContent = "Checking...";
+    try{
+        const r = await fetch("/api/check?url=" + encodeURIComponent(lastBuild.url) + "&pkg=" + encodeURIComponent(lastBuild.pkg));
+        const j = await r.json();
+        $("linkMsg").textContent = (j.ok ? "✓ " : "✗ ") + j.msg;
+    }catch(e){
+        $("linkMsg").textContent = "Check failed: " + e.message;
+    }
 });
 
 $("quickApp").addEventListener("click", () => showPage("appPage"));
