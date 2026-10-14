@@ -14,6 +14,15 @@ module.exports = async function handler(req, res) {
   const u = new URL(url);
   const site = u.origin;
 
+  let hasManifest = false;
+  try {
+    const m = await fetch(site + "/manifest.webmanifest");
+    if (m.body) m.body.cancel();
+    hasManifest = m.ok;
+  } catch (e) {}
+
+  let manifestUrl = hasManifest ? site + "/manifest.webmanifest" : "";
+
   const okPng = d => typeof d === "string" && d.length < 3500000 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(d);
   let iconUrl = site + "/icon-512.png";
   let maskableIconUrl = site + "/icon-maskable-512.png";
@@ -31,8 +40,24 @@ module.exports = async function handler(req, res) {
       const up = async (d, n) => (await put("icons/" + id + "-" + n + ".png", Buffer.from(d.split(",")[1], "base64"), { access: "public", contentType: "image/png", addRandomSuffix: true, ...(token ? { token } : {}) })).url;
       iconUrl = await up(icon, "icon");
       maskableIconUrl = await up(maskable, "maskable");
+      if (!manifestUrl) {
+        const manifest = {
+          name,
+          short_name: (short || name).slice(0, 12),
+          start_url: site + "/",
+          scope: site + "/",
+          display: "standalone",
+          background_color: "#07090d",
+          theme_color: color,
+          icons: [
+            { src: iconUrl, sizes: "512x512", type: "image/png", purpose: "any" },
+            { src: maskableIconUrl, sizes: "512x512", type: "image/png", purpose: "maskable" }
+          ]
+        };
+        manifestUrl = (await put("manifests/" + id + ".webmanifest", JSON.stringify(manifest), { access: "public", contentType: "application/manifest+json", addRandomSuffix: true, ...(token ? { token } : {}) })).url;
+      }
     } catch (e) {
-      return res.status(500).send("Icon upload failed: " + e.message);
+      return res.status(500).send("Upload failed: " + e.message);
     }
   } else {
     for (const f of ["/icon-512.png", "/icon-maskable-512.png"]) {
@@ -44,14 +69,8 @@ module.exports = async function handler(req, res) {
         return res.status(400).send("Cannot reach " + site + f);
       }
     }
+    if (!manifestUrl) return res.status(400).send("Missing /manifest.webmanifest on " + site);
   }
-
-  let hasManifest = false;
-  try {
-    const m = await fetch(site + "/manifest.webmanifest");
-    if (m.body) m.body.cancel();
-    hasManifest = m.ok;
-  } catch (e) {}
 
   const options = {
     packageId,
@@ -63,7 +82,7 @@ module.exports = async function handler(req, res) {
     startUrl: "/",
     fullScopeUrl: site + "/",
     pwaUrl: site + "/",
-    webManifestUrl: hasManifest ? site + "/manifest.webmanifest" : undefined,
+    webManifestUrl: manifestUrl,
     iconUrl,
     maskableIconUrl,
     monochromeIconUrl: null,
