@@ -168,9 +168,6 @@ body.no-nav .bottom-nav{display:none}
 .toast{position:fixed;left:50%;bottom:86px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:1000;padding:11px 16px;border-radius:12px;background:#171e29;border:1px solid #303b4c;font-size:11px;white-space:nowrap;transition:.25s}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 
-textarea.input{height:130px;resize:none;font:11px/1.5 "Courier New",monospace;white-space:pre}
-.out-head{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#aeb9ca;margin:14px 0 6px}
-.out-head button{border:1px solid var(--line);background:#111720;color:#b4c0d2;padding:6px 10px;border-radius:9px;font-size:10px}
 .legal h2{font-size:15px;margin:20px 0 6px}
 .legal p,.legal li{font-size:12px;color:#aeb9ca;line-height:1.75}
 .legal ul{padding-left:18px;margin:4px 0}
@@ -380,19 +377,9 @@ html,body{overscroll-behavior:none}
     <p id="buildMsg" style="font-size:12px;color:#aeb9ca;margin-top:8px;line-height:1.5"></p>
     <button class="modal-create" id="appDownload" style="display:none;margin-top:10px">⬇ Download my app</button>
   </div>
-  <button class="secondary-btn" id="appGenerate" style="width:100%;margin-top:6px">Site setup files (manifest, sw.js)</button>
 
-  <div id="appOut" style="display:none">
-    <div class="out-head"><span>1. manifest.webmanifest</span><button data-copy="outManifest">Copy</button></div>
-    <textarea class="input" id="outManifest" readonly></textarea>
-    <div class="out-head"><span>2. Paste inside &lt;head&gt; of your index.html</span><button data-copy="outHead">Copy</button></div>
-    <textarea class="input" id="outHead" readonly></textarea>
-    <div class="out-head"><span>3. sw.js</span><button data-copy="outSw">Copy</button></div>
-    <textarea class="input" id="outSw" readonly></textarea>
-    <div class="out-head"><span>4. App icons (4 PNG files)</span></div>
-    <button class="secondary-btn" id="appIcons" style="width:100%;margin-bottom:14px">⬇ Download icons</button>
-    <p style="font-size:11px;color:#8993a3;line-height:1.6;margin-bottom:14px">Put these files in the root of your website repo and deploy. Then build the real Android app (for Play Store) with PWABuilder. It opens your site in Chrome, not in a WebView.</p>
-  </div>
+  <button class="secondary-btn" id="appIcons" style="width:100%;margin-top:8px">⬇ Download icons</button>
+  <p style="font-size:11px;color:#8993a3;line-height:1.6;margin-top:10px">Step 1: tap "Download icons" and upload the 4 PNG files to the root of your website repo (next to index.html). Step 2: wait for the site to redeploy, then tap "Generate my app".</p>
 </section>
 
 <!-- LEGAL -->
@@ -1046,50 +1033,6 @@ function appValues(){
     }catch(e){ return null; }
 }
 
-$("appGenerate").addEventListener("click", () => {
-    const v = appValues();
-    if(!v){ showToast("Enter a valid https:// link"); return; }
-
-    $("outManifest").value = JSON.stringify({
-        name:v.name, short_name:v.short, id:"/", start_url:"/", scope:"/",
-        display:"standalone", orientation:"portrait",
-        background_color:"#07090d", theme_color:v.color,
-        icons:[
-            { src:"/icon-192.png", sizes:"192x192", type:"image/png", purpose:"any" },
-            { src:"/icon-512.png", sizes:"512x512", type:"image/png", purpose:"any" },
-            { src:"/icon-maskable-512.png", sizes:"512x512", type:"image/png", purpose:"maskable" }
-        ]
-    }, null, 2);
-
-    $("outHead").value =
-'<link rel="manifest" href="/manifest.webmanifest">\n' +
-'<meta name="theme-color" content="' + v.color + '">\n' +
-'<link rel="apple-touch-icon" href="/apple-touch-icon.png">\n' +
-'<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js")}<\/script>';
-
-    $("outSw").value =
-'const CACHE = "app-v1";\n' +
-'self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/"])).then(() => self.skipWaiting())); });\n' +
-'self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== CACHE).map(x => caches.delete(x)))).then(() => self.clients.claim())); });\n' +
-'self.addEventListener("fetch", e => {\n' +
-'  const r = e.request;\n' +
-'  if (r.method !== "GET" || new URL(r.url).origin !== location.origin) return;\n' +
-'  e.respondWith(fetch(r).then(res => { const c = res.clone(); caches.open(CACHE).then(x => x.put(r, c)); return res; }).catch(() => caches.match(r).then(h => h || caches.match("/"))));\n' +
-'});';
-
-    $("appOut").style.display = "block";
-    showToast("Files generated ✓");
-});
-
-document.querySelectorAll("[data-copy]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-        const t = $(btn.dataset.copy);
-        try{ await navigator.clipboard.writeText(t.value); }
-        catch(e){ t.select(); document.execCommand("copy"); }
-        showToast("Copied");
-    });
-});
-
 let appIconImg = null;
 
 function drawCover(g, img, x, y, w, h){
@@ -1182,11 +1125,10 @@ $("clearIcon").addEventListener("click", () => {
 });
 
 $("appIcons").addEventListener("click", () => {
-    const v = appValues();
-    if(!v){ showToast("Enter a valid https:// link"); return; }
-    const L = (v.short[0] || "K").toUpperCase();
+    const L = (($("appShort").value.trim() || $("appName").value.trim() || "K")[0]).toUpperCase();
+    const color = $("appColor").value;
     [[192,false,"icon-192.png"],[512,false,"icon-512.png"],[512,true,"icon-maskable-512.png"],[180,false,"apple-touch-icon.png"]]
-        .forEach((x, i) => setTimeout(() => makeIcon(x[0], L, v.color, x[1], x[2]), i * 500));
+        .forEach((x, i) => setTimeout(() => makeIcon(x[0], L, color, x[1], x[2]), i * 500));
     showToast("Downloading icons...");
 });
 
