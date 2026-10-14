@@ -14,15 +14,22 @@ module.exports = async function handler(req, res) {
   const u = new URL(url);
   const site = u.origin;
 
-  for (const f of ["/icon-512.png", "/icon-maskable-512.png", "/manifest.webmanifest"]) {
+  for (const f of ["/icon-512.png", "/icon-maskable-512.png"]) {
     try {
       const c = await fetch(site + f);
       if (c.body) c.body.cancel();
-      if (!c.ok) return res.status(400).send("Missing " + f + " on " + site + " (upload it to the ROOT of that site's repo, deploy, then try again)");
+      if (!c.ok) return res.status(400).send("Missing " + f + " on " + site + ". Tap Download icons, upload the PNG files to the ROOT of that site's repo, wait for deploy, then try again.");
     } catch (e) {
       return res.status(400).send("Cannot reach " + site + f);
     }
   }
+
+  let hasManifest = false;
+  try {
+    const m = await fetch(site + "/manifest.webmanifest");
+    if (m.body) m.body.cancel();
+    hasManifest = m.ok;
+  } catch (e) {}
 
   const options = {
     packageId,
@@ -34,7 +41,7 @@ module.exports = async function handler(req, res) {
     startUrl: "/",
     fullScopeUrl: site + "/",
     pwaUrl: site + "/",
-    webManifestUrl: site + "/manifest.webmanifest",
+    webManifestUrl: hasManifest ? site + "/manifest.webmanifest" : undefined,
     iconUrl: site + "/icon-512.png",
     maskableIconUrl: site + "/icon-maskable-512.png",
     monochromeIconUrl: null,
