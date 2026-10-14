@@ -21,14 +21,14 @@ module.exports = async function handler(req, res) {
   if (okPng(icon) && okPng(maskable)) {
     const tokenKey = Object.keys(process.env).find(k => k === "BLOB_READ_WRITE_TOKEN" || k.endsWith("_READ_WRITE_TOKEN"));
     const token = tokenKey ? process.env[tokenKey] : "";
-    if (!token) {
+    if (!token && !process.env.BLOB_STORE_ID) {
       const seen = Object.keys(process.env).filter(k => /BLOB|TOKEN/i.test(k)).join(", ") || "none";
       return res.status(500).send("Storage token not found in this deployment. Variables seen: " + seen + ". Connect the Blob store to this project, then redeploy.");
     }
     try {
       const { put } = await import("@vercel/blob");
       const id = Date.now().toString(36);
-      const up = async (d, n) => (await put("icons/" + id + "-" + n + ".png", Buffer.from(d.split(",")[1], "base64"), { access: "public", contentType: "image/png", addRandomSuffix: true, token })).url;
+      const up = async (d, n) => (await put("icons/" + id + "-" + n + ".png", Buffer.from(d.split(",")[1], "base64"), { access: "public", contentType: "image/png", addRandomSuffix: true, ...(token ? { token } : {}) })).url;
       iconUrl = await up(icon, "icon");
       maskableIconUrl = await up(maskable, "maskable");
     } catch (e) {
