@@ -1100,15 +1100,17 @@ function renderIcon(size, maskable, letter, color){
         grad.addColorStop(0, appIconInfo.c1);
         grad.addColorStop(1, appIconInfo.c2);
         g.fillStyle = grad;
-        g.fillRect(0, 0, size, size);
-        const scale = maskable ? 0.7 : 0.8;
+        if(maskable){ g.fillRect(0, 0, size, size); }
+        else{ g.beginPath(); g.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2); g.fill(); }
+        const scale = maskable ? 0.62 : 0.74;
         const w = size * scale, o = (size - w) / 2;
         g.drawImage(appIconImg, appIconInfo.sx, appIconInfo.sy, appIconInfo.sw, appIconInfo.sw, o, o, w, w);
     }else{
         grad.addColorStop(0, color);
         grad.addColorStop(1, "#7c3aed");
         g.fillStyle = grad;
-        g.fillRect(0, 0, size, size);
+        if(maskable){ g.fillRect(0, 0, size, size); }
+        else{ g.beginPath(); g.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2); g.fill(); }
         g.fillStyle = "#fff";
         g.textAlign = "center";
         g.textBaseline = "middle";
@@ -1192,13 +1194,16 @@ $("appMake").addEventListener("click", async () => {
         const status = r.headers.get("X-Links-Status");
         const note = decodeURIComponent(r.headers.get("X-Links-Note") || "");
         const al = r.headers.get("X-Assetlinks");
+        const live = r.headers.get("X-Links-Live");
         const blob = await r.blob();
         const href = URL.createObjectURL(blob);
 
         clearInterval(timer);
         bar.style.width = "100%";
-        if(status === "pushed"){
-            msg.textContent = "Your app is ready ✓ The verification file was added to " + note + ". 1) Wait about 1 minute until that site finishes deploying. 2) Uninstall the old app. 3) Install this new one. If the address bar is still there: Settings > Apps > Chrome > Storage > Clear data, then open the app again.";
+        if(live === "yes"){
+            msg.textContent = "Your app is ready ✓ The verification file is LIVE on your site. Uninstall the old app, install this one, then open it (if the address bar still shows: Settings > Apps > Chrome > Storage > Clear data).";
+        }else if(status === "pushed"){
+            msg.textContent = "Your app is ready, but your site is NOT serving the verification file yet (added to " + note + "). 1) Wait about 1 minute until that site finishes deploying. 2) Uninstall the old app. 3) Install this new one. If the address bar is still there: Settings > Apps > Chrome > Storage > Clear data, then open the app again.";
         }else{
             msg.textContent = "Your app is ready ✓" + (note ? " (auto-add failed: " + note + ")" : " Type the GitHub repo of your site (owner/repo) before generating, so the verification file is added for you.");
             if(al){
