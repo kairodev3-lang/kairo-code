@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#080d1a">
+<title>SYNAPSE AI</title>
+<link rel="icon" href="/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>(function(){try{var t=JSON.parse(localStorage.getItem("synapse_theme")||'"dark"'),l=t==="light"||(t==="system"&&matchMedia("(prefers-color-scheme: light)").matches);document.documentElement.dataset.theme=l?"light":"dark";document.documentElement.dataset.size=JSON.parse(localStorage.getItem("synapse_size")||'"m"')}catch(e){}})()</script>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="boot" class="boot"><img src="/icon-192.png" alt=""><div id="bootMsg">Loading…</div><button id="bootFix" class="pill" type="button" hidden>Repair and reload</button></div>
+<script>
+(function(){
+  var t=setTimeout(function(){var m=document.getElementById("bootMsg"),b=document.getElementById("bootFix");if(m)m.textContent="This is taking too long. Check your connection.";if(b)b.hidden=false;},9000);
+  window.__bootTimer=t;
+  document.getElementById("bootFix").onclick=function(){
+    var d=[];
+    try{
+      if(navigator.serviceWorker)d.push(navigator.serviceWorker.getRegistrations().then(function(r){return Promise.all(r.map(function(x){return x.unregister();}));}));
+      if(window.caches)d.push(caches.keys().then(function(k){return Promise.all(k.map(function(c){return caches.delete(c);}));}));
+    }catch(e){}
+    Promise.all(d).then(function(){location.reload();},function(){location.reload();});
+  };
+  window.addEventListener("load",function(){setTimeout(function(){if(!window.__appEnd){var m=document.getElementById("bootMsg"),b=document.getElementById("bootFix");if(m)m.textContent=(window.__app1End?"app2.js":"app1.js")+" is missing or incomplete. Upload it again to GitHub.";if(b)b.hidden=false;}},300);});
+  window.addEventListener("error",function(e){
+    var m=document.getElementById("bootMsg"),b=document.getElementById("bootFix");
+    if(window.__ready||!m)return;
+    m.textContent="The app could not start: "+(e.message||"error");b.hidden=false;
+  });
+})();
+</script>
+
+<div id="auth" class="modal authpage ishome">
+  <div class="authwrap">
+    <div class="authhero">
+      <img class="authlogo" src="/icon-192.png" alt="SYNAPSE AI">
+      <div class="wordmark">SYNAPSE AI</div>
+      <h2 id="authTitle">Welcome to SYNAPSE AI</h2>
+      <p id="authSub">Log in to keep your chats on every device.</p>
+      <div class="authchips"><span>Chats on every device</span><span>Voice replies</span><span>Code preview</span></div>
+    </div>
+    <div class="authbottom">
+      <div id="authMsg" class="msgbox" role="alert"></div>
+      <div id="authHome" class="authhome">
+        <button type="button" id="googleBtn" class="authbtn light"><svg class="gicon" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Continue with Google</button>
+        <button type="button" id="emailBtn" class="authbtn grad"><svg viewBox="0 0 24 24"><path d="M4 6h16v12H4zM4 7l8 6 8-6"/></svg>Continue with email</button>
+        <button type="button" id="codeBtn" class="authbtn"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Email me a login code</button>
+      </div>
+      <form id="authForm" novalidate>
+        <button class="linkbtn" id="authBack" type="button">&larr; Other ways to log in</button>
+        <div id="fName"><label for="aName">Name</label><input id="aName" autocomplete="name" placeholder="Your name"></div>
+        <div id="fEmail"><label for="aEmail">Email</label><input id="aEmail" type="email" autocomplete="email" placeholder="you@gmail.com"></div>
+        <div id="fPass"><label for="aPass">Password</label>
+          <div class="pw"><input id="aPass" type="password" autocomplete="current-password" placeholder="At least 8 characters"><button type="button" id="pwToggle" class="linkbtn">Show</button></div>
+        </div>
+        <div id="fPass2"><label for="aPass2">Confirm password</label><input id="aPass2" type="password" autocomplete="new-password" placeholder="Repeat the password"></div>
+        <div id="fCode"><label for="aCode">Code from your email</label><input id="aCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456"></div>
+        <button class="pill solid block" id="authSubmit" type="submit">Log in</button>
+      </form>
+      <button class="linkbtn" id="forgotBtn" type="button">Forgot password?</button>
+      <div class="switch" id="switchRow"><span id="switchText"></span> <button class="linkbtn" id="switchBtn" type="button"></button></div>
+    </div>
+  </div>
+</div>
+
+<div id="settings" class="page" role="dialog" aria-modal="true" aria-label="Settings">
+  <div class="phead"><button class="iconbtn" id="setBack" type="button" aria-label="Back" data-ic="back"></button><strong id="setTitle">Settings</strong></div>
+  <div class="pbody"><div class="pcol">
+
+    <div class="spage show" id="sp-home">
+      <button class="pcard" id="goAccount" type="button"><div class="avatar" id="spAvatar">K</div><div class="pctext"><strong id="spName"></strong><span id="spMail"></span></div><span class="sc" data-ic="chev"></span></button>
+      <div class="sgroup">
+        <button class="srow" id="goPersonal" type="button"><span class="si" data-ic="spark"></span><span class="sl">Personalization<small id="svPersonal"></small></span><span class="sc" data-ic="chev"></span></button>
+        <button class="srow" id="goVoice" type="button"><span class="si" data-ic="speaker"></span><span class="sl">Voice<small id="svVoice"></small></span><span class="sc" data-ic="chev"></span></button>
+      </div>
+      <div class="sgroup">
+        <button class="srow" id="goColor" type="button"><span class="si" data-ic="moon"></span><span class="sl">Color mode<small id="svColor"></small></span><span class="sc" data-ic="chev"></span></button>
+        <button class="srow" id="goFont" type="button"><span class="si" data-ic="font"></span><span class="sl">Font style<small id="svFont"></small></span><span class="sc" data-ic="chev"></span></button>
+      </div>
+      <div class="sgroup">
+        <label class="srow"><span class="si" data-ic="vib"></span><span class="sl">Haptic feedback</span><span class="switch"><input type="checkbox" id="tgHaptic"><i></i></span></label>
+        <label class="srow"><span class="si" data-ic="pause"></span><span class="sl">Reduce motion</span><span class="switch"><input type="checkbox" id="tgCalm"><i></i></span></label>
+        <label class="srow"><span class="si" data-ic="globe"></span><span class="sl">Open links in the app</span><span class="switch"><input type="checkbox" id="tgInApp"><i></i></span></label>
+        <label class="srow"><span class="si" data-ic="share"></span><span class="sl">Ask before opening links</span><span class="switch"><input type="checkbox" id="tgAsk"><i></i></span></label>
+      </div>
+      <div class="sgroup">
+        <button class="srow" id="goGeneral" type="button"><span class="si" data-ic="gear"></span><span class="sl">General</span><span class="sc" data-ic="chev"></span></button>
+        <button class="srow" id="goSecurity" type="button"><span class="si" data-ic="lock"></span><span class="sl">Security and login</span><span class="sc" data-ic="chev"></span></button>
+        <button class="srow" id="goHelp" type="button"><span class="si" data-ic="help"></span><span class="sl">Help and feedback</span><span class="sc" data-ic="chev"></span></button>
+      </div>
+      <div class="sgroup">
+        <button class="srow danger" id="homeLogout" type="button"><span class="si" data-ic="logout"></span><span class="sl">Log out</span></button>
+      </div>
+    </div>
+
+    <div class="spage" id="sp-account">
+      <div class="group">
+        <div class="avrow"><div class="avatar pavatar" id="sAvatar" role="button" aria-label="Change photo">K</div><div class="avbtns"><button class="pill" id="pickAvatar" type="button">Choose photo</button><button class="pill" id="rmAvatar" type="button" hidden>Remove photo</button></div></div>
+        <input id="avatarInput" type="file" accept="image/*">
+        <div class="field"><label for="sName">Display name</label><input class="inp" id="sName" autocomplete="name"></div>
+        <button class="pill solid" id="saveProfile" type="button">Save</button>
+      </div>
+      <div class="sgroup" style="margin-top:20px">
+        <div class="srow"><span class="si" data-ic="mail"></span><span class="sl">Email address</span><span class="sv" id="sEmail"></span></div>
+        <label class="srow" for="sBirth"><span class="si" data-ic="cal"></span><span class="sl">Date of birth</span><input class="sdate" id="sBirth" type="date" min="1900-01-01"></label>
+        <div class="srow"><span class="si" data-ic="user"></span><span class="sl">Age</span><span class="sv" id="sAge"></span></div>
+      </div>
+      <p class="hint">If you log in with Google, your date of birth is filled in automatically when your Google account shares it.</p>
+      <div class="sec">Recovery</div>
+      <div class="group">
+        <div class="field"><label for="sREmail">Recovery email</label><input class="inp" id="sREmail" type="email" autocomplete="email" placeholder="Another email to recover your account"></div>
+        <div class="field"><label for="sRPhone">Recovery phone number</label><input class="inp" id="sRPhone" type="tel" autocomplete="tel" placeholder="+509 ..."></div>
+        <button class="pill solid" id="saveRecovery" type="button">Save recovery info</button>
+      </div>
+      <div class="sgroup" style="margin-top:20px">
+        <button class="srow" id="setSwitch" type="button"><span class="si" data-ic="switch"></span><span class="sl">Switch account</span></button>
+        <button class="srow danger" id="setLogout" type="button"><span class="si" data-ic="logout"></span><span class="sl">Log out</span></button>
+      </div>
+    </div>
+
+    <div class="spage" id="sp-color">
+      <div class="sec">Color mode</div>
+      <div class="group"><div class="seg" id="themeSeg"><button type="button" data-v="system">System</button><button type="button" data-v="light">Light</button><button type="button" data-v="dark">Dark</button><button type="button" data-v="black">Black</button></div></div>
+    </div>
+
+    <div class="spage" id="sp-font">
+      <div class="sec">Font style</div>
+      <div class="group"><div class="seg" id="fontSeg"><button type="button" data-v="default">Default</button><button type="button" data-v="serif">Serif</button><button type="button" data-v="readable">Readable</button><button type="button" data-v="mono">Mono</button></div></div>
+      <div class="sec">Text size</div>
+      <div class="group"><div class="seg" id="sizeSeg"><button type="button" data-v="s">Small</button><button type="button" data-v="m">Medium</button><button type="button" data-v="l">Large</button></div></div>
+    </div>
+
+    <div class="spage" id="sp-personal">
+      <div class="sec">Reply language</div>
+      <div class="group"><select class="inp" id="pLang" aria-label="Reply language"><option value="auto">Auto (same language as my message)</option><option value="ht">Kreyòl ayisyen</option><option value="fr">Français</option><option value="en">English</option><option value="es">Español</option></select></div>
+      <div class="sec">Answer length</div>
+      <div class="group"><div class="seg" id="styleSeg"><button type="button" data-v="short">Short</button><button type="button" data-v="balanced">Balanced</button><button type="button" data-v="detailed">Detailed</button></div></div>
+      <div class="sec">About you and how to answer</div>
+      <div class="group">
+        <textarea class="inp" id="pAbout" rows="5" maxlength="600" placeholder="Example: I am a beginner developer. Explain step by step and show full code."></textarea>
+        <button class="pill solid" id="savePersonal" type="button">Save</button>
+      </div>
+    </div>
+
+    <div class="spage" id="sp-voice">
+      <div class="sec">Reading speed</div>
+      <div class="group"><div class="seg" id="speedSeg"><button type="button" data-v="slow">Slow</button><button type="button" data-v="normal">Normal</button><button type="button" data-v="fast">Fast</button></div></div>
+      <div class="group">
+        <p style="margin:12px 0 0;color:var(--muted);font-size:14px">Press the button to hear the voice with the speed you chose.</p>
+        <button class="pill solid" id="voiceTest" type="button">Play sample</button>
+      </div>
+    </div>
+
+    <div class="spage" id="sp-general">
+      <div class="sec">Conversations <span id="convCount"></span></div>
+      <div class="group" id="convList" style="padding:4px 8px"></div>
+      <div class="sec">Cloud sync</div>
+      <div class="group">
+        <p id="syncStatus" style="margin:12px 0 0;font-size:14px;color:var(--muted);overflow-wrap:anywhere">Checking…</p>
+        <button class="pill solid" id="syncNow" type="button">Sync now</button>
+      </div>
+      <div class="sec">Data</div>
+      <div class="group">
+        <p style="margin:12px 0 0;color:var(--muted);font-size:14px">Your chats are saved to your account and on this device.</p>
+        <button class="pill" id="exportChats" type="button">Export my chats</button>
+        <button class="pill danger" id="clearAll" type="button" style="margin-left:8px">Delete all chats</button>
+        <button class="pill danger" id="delAccount" type="button" style="margin-left:8px">Delete my account</button>
+      </div>
+    </div>
+
+    <div class="spage" id="sp-security">
+      <div class="sec">Password</div>
+      <div class="group">
+        <div class="field"><label for="sPassOld">Current password</label><input class="inp" id="sPassOld" type="password" autocomplete="current-password" placeholder="Leave empty if you only use email codes"></div>
+        <div class="field"><label for="sPass">New password</label><input class="inp" id="sPass" type="password" autocomplete="new-password" placeholder="At least 8 characters"></div>
+        <div class="field"><label for="sPass2">Confirm new password</label><input class="inp" id="sPass2" type="password" autocomplete="new-password"></div>
+        <button class="pill solid" id="savePass" type="button">Update password</button>
+      </div>
+    </div>
+
+  </div></div>
+</div>
+
+<div id="confirm" class="modal"><div class="card" style="max-width:360px">
+  <h2 id="cfTitle" style="font-size:23px"></h2><p id="cfText"></p>
+  <div class="cfrow"><button class="pill" id="cfNo" type="button">Cancel</button><button class="pill danger" id="cfYes" type="button">Delete</button></div>
+</div></div>
+
+<div id="browser" class="brw" aria-hidden="true">
+  <div class="brwbar">
+    <button class="iconbtn" id="brwClose" type="button" aria-label="Close" data-ic="x"></button>
+    <button class="iconbtn" id="brwMin" type="button" aria-label="Back to chat" data-ic="down"></button>
+    <div class="brwtitle"><strong id="brwTitle"></strong><span id="brwHost"></span></div>
+    <button class="iconbtn" id="brwShare" type="button" aria-label="Share" data-ic="share"></button>
+    <button class="iconbtn" id="brwTr" type="button" aria-label="Translate" data-ic="translate"></button>
+    <button class="iconbtn" id="brwMenu" type="button" aria-label="More" data-ic="dots"></button>
+    <div class="brwprog" id="brwProg"></div>
+  </div>
+  <div class="brwblocked" id="brwBlocked">
+    <p><b id="brwBlockedHost"></b> does not allow being shown inside the app.</p>
+    <button class="pill solid" id="brwBlockedOpen" type="button">Open in browser</button>
+  </div>
+  <iframe id="brwFrame" title="Web page" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe>
+  <div class="brwmenu" id="brwMenuList">
+    <button type="button" id="brwOpen">Open in browser</button>
+    <button type="button" id="brwCopy">Copy link</button>
+    <button type="button" id="brwReload">Reload</button>
+  </div>
+</div>
+<div id="miniBrowser" class="brwmini"><button type="button" id="miniOpen"><span data-ic="globe"></span><span id="miniHost"></span></button><button class="iconbtn" id="miniClose" type="button" aria-label="Close" data-ic="x"></button></div>
+
+<div id="linkAsk" class="modal"><div class="card" style="max-width:380px">
+  <h2 style="font-size:23px">Open external link</h2>
+  <div class="urlbox" id="linkUrl"></div>
+  <label class="chk"><input type="checkbox" id="linkRemember"><span id="linkRememberText"></span></label>
+  <div class="cfrow"><button class="pill" id="linkNo" type="button">Cancel</button><button class="pill solid" id="linkYes" type="button">Open</button></div>
+</div></div>
+
+<div id="fbModal" class="modal"><div class="card" style="max-width:420px">
+  <h2 id="fbTitle" style="font-size:23px">Help and feedback</h2>
+  <textarea class="inp fbtext" id="fbText" maxlength="1500" rows="5" aria-label="Your message"></textarea>
+  <div class="cfrow"><button class="pill" id="fbNo" type="button">Cancel</button><button class="pill solid" id="fbYes" type="button">Send</button></div>
+</div></div>
+
+<div id="renameModal" class="modal"><div class="card" style="max-width:360px">
+  <h2 style="font-size:23px">Rename chat</h2>
+  <input id="renameInput" maxlength="60" autocomplete="off" aria-label="Chat name">
+  <div class="cfrow" style="margin-top:16px"><button class="pill" id="renameCancel" type="button">Cancel</button><button class="pill solid" id="renameSave" type="button">Save</button></div>
+</div></div>
+
+<div id="backdrop" class="backdrop"></div>
+
+<div id="sheet" class="sheetbg" role="dialog" aria-modal="true" aria-label="Add to the conversation">
+  <div class="sheet">
+    <div class="sheetgrab"></div>
+    <div class="sheetgrid">
+      <button type="button" class="shopt" id="shCam"><span data-ic="camera"></span>Camera</button>
+      <button type="button" class="shopt" id="shPhoto"><span data-ic="image"></span>Photos</button>
+      <button type="button" class="shopt" id="shFile"><span data-ic="file"></span>Files</button>
+    </div>
+  </div>
+</div>
+
+<div id="viewer" class="viewer" role="dialog" aria-modal="true">
+  <div class="vhead">
+    <button class="iconbtn" id="vclose" type="button" aria-label="Close" data-ic="x"></button>
+    <strong id="vtitle"></strong>
+    <button class="pill" id="vmode" type="button" style="display:none">Code</button>
+    <button class="pill" id="vcopy" type="button">Copy</button>
+    <button class="pill solid" id="vdl" type="button">Download</button>
+  </div>
+  <div class="vbody" id="vbody"></div>
+</div>
+
+<div id="chatMenu" class="pop" hidden role="menu">
+  <div class="poptitle" id="menuTitle"></div>
+  <button class="popitem" data-m="rename" type="button"><svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Rename</button>
+  <button class="popitem" data-m="export" type="button"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5"/></svg>Export chat (.md)</button>
+  <button class="popitem" data-m="copycode" type="button"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>Copy all code</button>
+  <button class="popitem" data-m="zip" type="button"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg>Download code (.zip)</button>
+</div>
+
+<div id="acctMenu" class="pop" hidden role="menu">
+  <div class="poptitle" id="accountEmail"></div>
+  <button class="popitem" id="openSettings" type="button" data-ic="gear" style="gap:14px">Settings</button>
+  <button class="popitem" id="switchAcct" type="button" data-ic="switch">Switch account</button>
+  <button class="popitem danger" id="logoutBtn" type="button" data-ic="logout">Log out</button>
+</div>
+<div id="convMenu" class="pop" hidden style="z-index:75;width:190px"><button class="popitem danger" id="convDel" type="button" data-ic="trash">Delete</button></div>
+<div id="toast" class="toast" role="status"></div>
+
+<div class="app">
+  <aside id="side" class="sidebar">
+    <div class="brandrow"><img src="/icon-192.png" alt=""><span>SYNAPSE AI</span></div>
+    <button class="newpill" id="newChatBtn" type="button"><span data-ic="plus" style="display:grid"></span>New chat</button>
+    <div class="searchbox"><span data-ic="search" style="display:grid"></span><input id="searchInput" placeholder="Search chats" autocomplete="off" aria-label="Search chats"></div>
+    <div id="syncBanner" class="syncbanner" hidden></div>
+    <div id="chatList" class="chats"></div>
+    <div class="sidefoot">
+      <button class="acctrow" id="avatarBtn" type="button" aria-haspopup="menu" aria-label="Account"><span class="avatar" id="avLetter">G</span><span class="acctname" id="avName">Guest</span></button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div id="apkBar" class="apkbar" hidden><img src="/icon-192.png" alt=""><span>Download the SYNAPSE AI app for a faster, smoother experience.</span><a class="pill solid" id="apkBtn" href="/synapse-ai-2.apk" download>Download</a><button class="iconbtn" id="apkX" type="button" aria-label="Close" data-ic="x"></button></div>
+    <header class="top">
+      <button class="iconbtn menu" id="menuBtn" type="button" aria-label="Open menu" data-ic="menu"></button>
+      <strong class="toptitle" id="topTitle">SYNAPSE AI</strong>
+      <button class="iconbtn" id="moreBtn" type="button" aria-label="More" aria-haspopup="menu" data-ic="dots"></button>
+    </header>
+    <section id="messages" class="messages" aria-live="polite"><div id="inner" class="inner"></div></section>
+    <div class="composerWrap">
+      <button id="toBottom" class="tobottom" type="button" hidden aria-label="Scroll to latest" data-ic="down"></button>
+      <div class="composerBox">
+        <div class="composer">
+          <div id="attachRow" class="attachRow"></div>
+          <div id="typeArea">
+            <textarea id="prompt" rows="1" placeholder="Message SYNAPSE AI" aria-label="Message"></textarea>
+            <div class="cbar">
+              <input id="camInput" type="file" accept="image/*" capture="environment">
+              <input id="photoInput" type="file" multiple accept="image/*">
+              <input id="fileInput" type="file" multiple>
+              <button class="circ" id="attachBtn" type="button" aria-label="Add to the conversation" data-ic="plus"></button>
+              <button class="chipbtn" id="thinkBtn" type="button" aria-pressed="false" title="Deep thinking: slower, better for hard problems"><span data-ic="spark" style="display:grid"></span>Think</button>
+              <span class="grow"></span>
+              <button class="circ" id="voiceBtn" type="button" aria-label="Record a voice message" data-ic="mic"></button>
+              <button class="sendbtn" id="sendBtn" type="button" aria-label="Send" disabled data-ic="up"></button>
+            </div>
+          </div>
+          <div id="recBar" class="recbar" hidden>
+            <button class="circ" id="recCancel" type="button" aria-label="Cancel recording" data-ic="x"></button>
+            <div class="wave" id="wave"></div>
+            <span id="recTime">0:00</span>
+            <button class="sendbtn" id="recSend" type="button" aria-label="Send voice message" data-ic="check"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/app1.js"></script>
+<script src="/app2.js"></script>
+</body>
+</html>
