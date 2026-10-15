@@ -26,19 +26,20 @@ function zipFind(buf, suffix) {
   return null;
 }
 
-/* add or update .well-known/assetlinks.json in the site's GitHub repo */
-async function pushAssetlinks(repoInput, pkg, newText) {
-  let repo = String(repoInput || "").trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "");
-  if (!/^[\w.-]+(\/[\w.-]+)?$/.test(repo)) return { ok: false, note: "Invalid GitHub repo" };
-  if (!process.env.GH_TOKEN) return { ok: false, note: "GH_TOKEN is not set in Vercel" };
-  if (!repo.includes("/")) {
-    const u = await gh("/user");
-    if (!u.ok) return { ok: false, note: "GH_TOKEN is not valid" };
-    repo = (await u.json()).login + "/" + repo;
-  }
-  const path = "/repos/" + repo + "/contents/.well-known/assetlinks.json";
+/* ---- put assetlinks.json in the right folder(s) of the site's GitHub repo ----
+   plain sites serve  .well-known/assetlinks.json  from the repo root.
+   Vite / Next / React / Astro / Nuxt / Svelte sites only serve what is inside  public/  (or  static/ ),
+   so for those the file is added there too. */
+const exists = async (repo, p) => {
+  const r = await gh("/repos/" + repo + "/contents/" + p);
+  if (r.body) r.body.cancel().catch(() => {});
+  return r.ok;
+};
+
+async function putOne(repo, path, pkg, newText) {
+  const api = "/repos/" + repo + "/contents/" + path;
   let sha, list = [], old = [];
-  const cur = await gh(path);
+  const cur = await gh(api);
   if (cur.ok) {
     const j = await cur.json();
     sha = j.sha;
@@ -46,8 +47,7 @@ async function pushAssetlinks(repoInput, pkg, newText) {
       const arr = JSON.parse(Buffer.from(j.content, "base64").toString("utf8"));
       if (Array.isArray(arr)) {
         list = arr.filter(x => !(x && x.target && x.target.package_name === pkg));
-        /* keep the fingerprints of earlier builds of the same app: every build makes a new signing key,
-           and replacing the old one would bring the address bar back on apps installed from older builds */
+        /* keep fingerprints of earlier builds of the same app (each build makes a new key) */
         arr.forEach(x => {
           if (x && x.target && x.target.package_name === pkg && Array.isArray(x.target.sha256_cert_fingerprints)) old.push(...x.target.sha256_cert_fingerprints);
         });
@@ -60,14 +60,47 @@ async function pushAssetlinks(repoInput, pkg, newText) {
   try { mine = JSON.parse(newText); } catch (e) { return { ok: false, note: "assetlinks.json is not valid" }; }
   mine.forEach(m => {
     if (m && m.target && m.target.package_name === pkg) {
-      const all = Array.from(new Set((m.target.sha256_cert_fingerprints || []).concat(old)));
-      m.target.sha256_cert_fingerprints = all.slice(-10);
+      m.target.sha256_cert_fingerprints = Array.from(new Set((m.target.sha256_cert_fingerprints || []).concat(old))).slice(-10);
     }
   });
   const body = { message: "Add app verification file (Kairo Code)", content: Buffer.from(JSON.stringify(list.concat(mine), null, 2)).toString("base64") };
   if (sha) body.sha = sha;
-  const put = await gh(path, { method: "PUT", body: JSON.stringify(body) });
-  return put.ok ? { ok: true, note: repo } : { ok: false, note: "GitHub refused the file (" + put.status + "). The token needs write access to " + repo };
+  const put = await gh(api, { method: "PUT", body: JSON.stringify(body) });
+  return put.ok ? { ok: true } : { ok: false, note: "GitHub refused the file (" + put.status + "). The token needs write access to " + repo };
+}
+
+async function pushAssetlinks(repoInput, pkg, newText) {
+  let repo = String(repoInput || "").trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/+$/, "").replace(/\.git$/, "");
+  if (!/^[\w.-]+(\/[\w.-]+)?$/.test(repo)) return { ok: false, note: "Invalid GitHub repo" };
+  if (!process.env.GH_TOKEN) return { ok: false, note: "GH_TOKEN is not set in Vercel" };
+  if (!repo.includes("/")) {
+    const u = await gh("/user");
+    if (!u.ok) return { ok: false, note: "GH_TOKEN is not valid" };
+    repo = (await u.json()).login + "/" + repo;
+  }
+  const info = await gh("/repos/" + repo);
+  if (!info.ok) return { ok: false, note: "Cannot open " + repo + " (" + info.status + "). Check the repo name and that the token can write to it" };
+  if (info.body) await info.json().catch(() => {});
+
+  /* which folders does this site serve? */
+  const [hasPublic, hasStatic, pj] = await Promise.all([
+    exists(repo, "public"), exists(repo, "static"),
+    gh("/repos/" + repo + "/contents/package.json").then(async r => r.ok ? Buffer.from((await r.json()).content || "", "base64").toString("utf8") : "").catch(() => "")
+  ]);
+  const framework = /"(vite|next|react-scripts|astro|nuxt|gatsby|@sveltejs\/kit|@remix-run\/[\w-]+|vue-cli-service|@vue\/cli-service)"/.test(pj);
+  const svelteKit = /"@sveltejs\/kit"/.test(pj);
+
+  const targets = [".well-known/assetlinks.json"];
+  if (hasPublic || framework) targets.push("public/.well-known/assetlinks.json");
+  if (svelteKit || (hasStatic && framework)) targets.push("static/.well-known/assetlinks.json");
+
+  const done = [];
+  for (const t of targets) {
+    const r = await putOne(repo, t, pkg, newText);
+    if (!r.ok) return r;
+    done.push(t);
+  }
+  return { ok: true, note: repo + " (" + done.join(", ") + ")" };
 }
 
 async function main(req, res) {
