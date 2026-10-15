@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>KAIRO CODE - Mobile Web Builder | HTML, CSS, JavaScript</title>
+<meta name="description" content="KAIRO CODE is a free mobile web builder. Create, edit, run and export websites with HTML, CSS and JavaScript directly from your phone.">
+<meta name="keywords" content="KAIRO CODE, KAIRO DEV, mobile code editor, web builder, HTML, CSS, JavaScript, online editor">
+<meta name="author" content="KAIRO DEV">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#07090d">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="KAIRO CODE">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="canonical" href="https://kairo-code.vercel.app/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='26' fill='%232563eb'/%3E%3Ctext x='50' y='68' font-size='58' font-weight='900' text-anchor='middle' fill='white' font-family='Arial'%3EK%3C/text%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="KAIRO CODE">
+<meta property="og:title" content="KAIRO CODE - Mobile Web Builder">
+<meta property="og:description" content="Create, edit, run and export websites with HTML, CSS and JavaScript from your phone.">
+<meta property="og:url" content="https://kairo-code.vercel.app/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="KAIRO CODE - Mobile Web Builder">
+<meta name="twitter:description" content="Create, edit, run and export websites with HTML, CSS and JavaScript from your phone.">
+<!-- Google Search Console: paste your verification tag here, e.g. <meta name="google-site-verification" content="YOUR_CODE"> -->
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"KAIRO CODE","url":"https://kairo-code.vercel.app/","description":"Mobile web builder to create, edit, run and export websites with HTML, CSS and JavaScript.","applicationCategory":"DeveloperApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"creator":{"@type":"Organization","name":"KAIRO DEV"}}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#07090d;--card:#10141c;--line:#232a36;--muted:#8993a3;--blue2:#60a5fa;--grad:linear-gradient(135deg,#2563eb,#7c3aed);--fs:13px}
+html,body{width:100%;min-height:100%;background:var(--bg);color:#f7f9fc;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+body{overflow-x:hidden}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+.page{display:none;min-height:100vh;min-height:100dvh;padding-bottom:85px}
+.page.active{display:block}
+.page.editor-page,.page.preview-page{padding-bottom:0}
+body.no-nav .bottom-nav{display:none}
+
+/* header */
+.top{height:68px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(7,9,13,.92);backdrop-filter:blur(18px);position:sticky;top:0;z-index:50}
+.brand{display:flex;align-items:center;gap:11px}
+.brand-logo{width:39px;height:39px;border-radius:13px;display:flex;justify-content:center;align-items:center;font-weight:900;background:var(--grad);box-shadow:0 8px 30px rgba(59,130,246,.25)}
+.brand-name{font-size:16px;font-weight:900;letter-spacing:.4px}
+.brand-name span{color:var(--blue2)}
+.top-actions{display:flex;gap:8px}
+.circle-btn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:#fff;font-size:17px}
+
+/* home */
+.home{padding:20px 17px;max-width:900px;margin:auto}
+.hero{padding:23px;border-radius:25px;background:radial-gradient(circle at top right,rgba(59,130,246,.2),transparent 45%),linear-gradient(145deg,#111827,#0d1118);border:1px solid rgba(96,165,250,.12);position:relative;overflow:hidden}
+.hero-small{color:#7fa9ff;font-size:12px;font-weight:800;letter-spacing:1.4px;margin-bottom:9px}
+.hero h1{font-size:28px;line-height:1.15;margin-bottom:9px}
+.hero p{color:var(--muted);font-size:13px;line-height:1.6;max-width:540px}
+.hero-actions{display:flex;gap:9px;margin-top:20px}
+.primary-btn,.secondary-btn{padding:12px 16px;border-radius:12px;font-weight:800;color:#fff}
+.primary-btn{border:0;background:var(--grad)}
+.secondary-btn{border:1px solid var(--line);background:#11161f;color:#d9e2ef;font-weight:700}
+.section{margin-top:25px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.section-head h2{font-size:16px}
+.section-head button{border:0;background:none;color:#70a5ff;font-size:12px}
+.projects{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}
+.project-card{min-height:145px;padding:15px;border-radius:18px;background:linear-gradient(145deg,#121720,#0d1118);border:1px solid var(--line);position:relative;cursor:pointer}
+.project-card:active{transform:scale(.98)}
+.project-icon{width:43px;height:43px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:var(--grad);font-weight:900;margin-bottom:17px}
+.project-title{font-size:14px;font-weight:800;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}
+.project-meta{font-size:10px;color:var(--muted)}
+.project-more{position:absolute;right:10px;top:10px;width:32px;height:32px;border:0;background:rgba(255,255,255,.06);border-radius:9px;color:#f87171}
+.empty{display:none;padding:40px 20px;text-align:center;border:1px dashed #293241;border-radius:18px;color:var(--muted)}
+.empty-icon{font-size:35px;margin-bottom:10px}
+
+/* bottom nav */
+.bottom-nav{position:fixed;left:0;right:0;bottom:0;height:72px;background:rgba(9,12,17,.96);border-top:1px solid rgba(255,255,255,.07);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:space-around;z-index:200}
+.nav-btn{border:0;background:none;color:#687386;min-width:70px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px}
+.nav-btn .ic{font-size:19px}
+.nav-btn.active{color:#65a1ff}
+.nav-plus{width:43px;height:43px;margin-top:-17px;border-radius:15px;display:flex;align-items:center;justify-content:center;color:#fff;background:var(--grad);box-shadow:0 8px 25px rgba(59,130,246,.3);font-size:19px}
+
+/* editor + preview top bars */
+.editor-top,.preview-top{height:62px;display:flex;align-items:center;gap:10px;padding:0 11px;border-bottom:1px solid var(--line);background:#0a0d13;position:sticky;top:0;z-index:80}
+.back-btn{width:40px;height:40px;border:0;border-radius:11px;background:#121722;color:#fff;font-size:18px}
+.editor-title,.preview-title{flex:1;min-width:0}
+.editor-title strong,.preview-title strong{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.editor-title small,.preview-title small{color:#6f7a8c;font-size:9px}
+.run-main{border:0;padding:10px 14px;border-radius:11px;color:#fff;font-size:12px;font-weight:900;background:var(--grad)}
+.preview-actions{display:flex;gap:6px}
+.preview-icon{width:38px;height:38px;border:1px solid var(--line);background:#111720;border-radius:10px;color:#fff}
+
+/* file tabs */
+.file-bar{height:58px;padding:8px 10px;display:flex;align-items:center;gap:8px;overflow-x:auto;border-bottom:1px solid var(--line);background:#0b0f16}
+.file-tab{height:39px;padding:0 13px;display:flex;align-items:center;gap:8px;flex:none;border-radius:10px;border:1px solid var(--line);background:#111620;color:#7f8b9e;font-size:11px}
+.file-tab.active{color:#fff;border-color:#31558e;background:#142035}
+.file-tab.html b{color:#f97316}
+.file-tab.css b{color:#3b82f6}
+.file-tab.js b{color:#facc15}
+.new-file-small{flex:none;width:39px;height:39px;border-radius:10px;border:1px dashed #39465b;color:#78a9ff;background:transparent;font-size:18px}
+
+/* code editor */
+.editor-shell{height:calc(100vh - 120px);height:calc(100dvh - 120px);min-height:300px;display:flex;flex-direction:column;background:#080b10}
+.code-area{flex:1;display:flex;overflow:hidden;min-height:0}
+.line-numbers{width:43px;flex:none;padding:14px 8px 30px 0;text-align:right;color:#3e4859;font:var(--fs)/1.75 "Courier New",monospace;overflow:hidden;user-select:none;background:#070a0f;border-right:1px solid #121822}
+.code-input{flex:1;width:100%;height:100%;resize:none;outline:none;border:0;padding:14px;background:#080b10;color:#dce7f8;font:var(--fs)/1.75 "Courier New",monospace;tab-size:2;white-space:pre;overflow:auto}
+.code-input::selection{background:#244a86}
+.editor-footer{height:53px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 10px;border-top:1px solid var(--line);background:#0c1017}
+.editor-info{color:#657084;font-size:10px;white-space:nowrap}
+.editor-tools{display:flex;gap:6px}
+.editor-tool{border:1px solid var(--line);background:#111720;color:#b4c0d2;padding:8px 10px;border-radius:9px;font-size:10px}
+.editor-tool.danger{color:#f87171}
+
+/* preview */
+.preview-content{min-height:calc(100vh - 62px);min-height:calc(100dvh - 62px);background:#e9edf2;display:flex;justify-content:center;align-items:flex-start}
+.preview-iframe{width:100%;height:calc(100vh - 62px);height:calc(100dvh - 62px);border:0;background:#fff}
+
+/* projects page */
+.files-head{padding:20px 17px 14px;position:sticky;top:0;z-index:40;background:rgba(7,9,13,.94);backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:space-between}
+.files-head h1{font-size:23px}
+.files-head p{color:var(--muted);font-size:11px;margin-top:5px}
+.file-add-btn{width:43px;height:43px;border:0;border-radius:13px;color:#fff;background:var(--grad);font-size:22px}
+.file-list{padding:0 14px}
+.file-row{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line);background:var(--card);border-radius:15px;margin-bottom:8px;cursor:pointer}
+.file-big-icon{width:43px;height:43px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#161d29;font-weight:900;color:#fb923c}
+.file-row-info{flex:1;min-width:0}
+.file-row-name{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.file-row-meta{color:#687487;font-size:9px;margin-top:4px}
+.row-btn{width:35px;height:35px;border:1px solid var(--line);border-radius:10px;background:#141a24;color:#9fb9e8}
+.row-btn.danger{color:#f87171}
+
+/* settings */
+.settings-page{padding:20px 17px 90px}
+.settings-page h1{font-size:24px;margin-bottom:6px}
+.settings-sub{color:var(--muted);font-size:11px;margin-bottom:25px}
+.setting-group{margin-bottom:20px}
+.setting-label{color:#667286;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.setting-card{background:var(--card);border:1px solid var(--line);border-radius:15px;overflow:hidden}
+.setting-item{min-height:53px;padding:0 14px;display:flex;align-items:center;gap:11px;border-bottom:1px solid rgba(255,255,255,.05)}
+.setting-item:last-child{border-bottom:0}
+.setting-item.click{cursor:pointer}
+.setting-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:#161d28;font-size:12px}
+.setting-text{flex:1}
+.setting-text strong{display:block;font-size:12px}
+.setting-text span{display:block;color:#697487;font-size:9px;margin-top:3px}
+.toggle{width:39px;height:22px;padding:2px;border:0;border-radius:20px;background:#273141}
+.toggle:after{content:"";display:block;width:18px;height:18px;border-radius:50%;background:#8490a1;transition:.2s}
+.toggle.on{background:#2563eb}
+.toggle.on:after{transform:translateX(17px);background:#fff}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(5px);display:none;align-items:flex-end;justify-content:center;z-index:500}
+.modal-bg.show{display:flex}
+.modal{width:100%;max-width:600px;padding:20px;border-radius:23px 23px 0 0;background:#10151e;border:1px solid #273140;animation:up .22s ease}
+@keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:17px}
+.modal-head h2{font-size:18px}
+.close-modal{width:35px;height:35px;border:0;border-radius:10px;background:#181f2a;color:#fff}
+.input{width:100%;padding:13px;border-radius:12px;border:1px solid var(--line);background:#080c12;color:#fff;outline:none;margin-bottom:11px}
+.input:focus{border-color:#3569b5}
+.file-type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:15px}
+.type-btn{padding:12px 5px;border:1px solid var(--line);background:#121923;color:#aeb9ca;border-radius:11px;font-size:11px}
+.type-btn.selected{border-color:#3976c9;background:#14243b;color:#fff}
+.modal-create{width:100%;border:0;padding:13px;border-radius:12px;background:var(--grad);color:#fff;font-weight:900}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:86px;transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:1000;padding:11px 16px;border-radius:12px;background:#171e29;border:1px solid #303b4c;font-size:11px;white-space:nowrap;transition:.25s}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+.legal h2{font-size:15px;margin:20px 0 6px}
+.legal p,.legal li{font-size:12px;color:#aeb9ca;line-height:1.75}
+.legal ul{padding-left:18px;margin:4px 0}
+.legal a{color:#70a5ff}
+.legal-links{margin-top:26px;text-align:center;font-size:11px;color:#687386}
+.legal-links a{color:#8aa8d8;text-decoration:none;margin:0 6px}
+html,body{overscroll-behavior:none}
+.bottom-nav{height:calc(72px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px)}
+.nav-btn,.circle-btn,.back-btn,.run-main{user-select:none;-webkit-user-select:none}
+@media(min-width:800px){
+.home{padding-top:35px}
+.projects{grid-template-columns:repeat(3,1fr)}
+.hero h1{font-size:34px}
+.modal-bg{align-items:center}
+.modal{border-radius:22px}
+.editor-shell{max-width:1200px;margin:auto}
+.preview-content{padding:25px}
+.preview-iframe{max-width:1200px;height:calc(100vh - 112px);height:calc(100dvh - 112px);border-radius:15px}
+}
+@media(max-width:380px){
+.hero{padding:18px}
+.hero h1{font-size:24px}
+.projects{gap:8px}
+.project-card{min-height:135px;padding:12px}
+}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<section id="homePage" class="page active">
+  <header class="top">
+    <div class="brand">
+      <div class="brand-logo">K</div>
+      <div class="brand-name">KAIRO <span>CODE</span></div>
+    </div>
+    <div class="top-actions">
+      <button class="circle-btn" id="searchBtn">⌕</button>
+      <button class="circle-btn" id="settingsTop">⚙</button>
+    </div>
+  </header>
+
+  <main class="home">
+    <div class="hero">
+      <div class="hero-small">KAIRO DEV</div>
+      <h1>Build your web.<br>Your way.</h1>
+      <p>Create websites directly from your phone with HTML, CSS and JavaScript.</p>
+      <div class="hero-actions">
+        <button class="primary-btn" id="createProjectBtn">＋ Create Project</button>
+        <button class="secondary-btn" id="filesHeroBtn">Projects</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2>Your Projects</h2>
+        <button id="seeAll">See all</button>
+      </div>
+      <div class="projects" id="projectGrid"></div>
+      <div class="empty" id="emptyProjects">
+        <div class="empty-icon">◇</div>
+        <strong>No projects yet</strong>
+        <p style="margin-top:6px;font-size:11px">Create your first website.</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>Quick Start</h2></div>
+      <div class="setting-card">
+        <div class="setting-item click" id="quickHtml">
+          <div class="setting-icon">&lt;/&gt;</div>
+          <div class="setting-text"><strong>HTML Website</strong><span>Start with a clean HTML page</span></div>
+          <span>›</span>
+        </div>
+        <div class="setting-item click" id="quickLanding">
+          <div class="setting-icon">◈</div>
+          <div class="setting-text"><strong>Landing Page</strong><span>Create a modern landing page</span></div>
+          <span>›</span>
+        </div>
+        <div class="setting-item click" id="quickApp">
+          <div class="setting-icon">📱</div>
+          <div class="setting-text"><strong>Website → App</strong><span>Turn a website link into a real app</span></div>
+          <span>›</span>
+        </div>
+      </div>
+    </div>
+    <div class="legal-links">
+      <a href="#privacy" data-legal="privacy">Privacy</a>·<a href="#terms" data-legal="terms">Terms</a>·<a href="https://t.me/devxkairo" target="_blank" rel="noopener noreferrer">Contact</a>
+    </div>
+  </main>
+</section>
+
+<!-- PROJECTS -->
+<section id="filesPage" class="page">
+  <div class="files-head">
+    <div>
+      <h1>Projects</h1>
+      <p>Manage your websites and files</p>
+    </div>
+    <button class="file-add-btn" id="createProjectBtn2">＋</button>
+  </div>
+  <div class="file-list" id="allProjects"></div>
+</section>
+
+<!-- SETTINGS -->
+<section id="settingsPage" class="page settings-page">
+  <h1>Settings</h1>
+  <p class="settings-sub">Configure your KAIRO CODE workspace</p>
+
+  <div class="setting-group">
+    <div class="setting-label">Editor</div>
+    <div class="setting-card">
+      <div class="setting-item">
+        <div class="setting-icon">Aa</div>
+        <div class="setting-text"><strong>Large Text</strong><span>Increase editor font size</span></div>
+        <button class="toggle" id="fontToggle"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="setting-group" id="installGroup" style="display:none">
+    <div class="setting-label">App</div>
+    <div class="setting-card">
+      <div class="setting-item click" id="installBtn">
+        <div class="setting-icon">⬇</div>
+        <div class="setting-text"><strong>Install App</strong><span>Add KAIRO CODE to your home screen</span></div>
+        <span>›</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="setting-group">
+    <div class="setting-label">Legal</div>
+    <div class="setting-card">
+      <div class="setting-item click" data-legal="privacy">
+        <div class="setting-icon">🔒</div>
+        <div class="setting-text"><strong>Privacy Policy</strong><span>How your data is handled</span></div>
+        <span>›</span>
+      </div>
+      <div class="setting-item click" data-legal="terms">
+        <div class="setting-icon">📄</div>
+        <div class="setting-text"><strong>Terms of Use</strong><span>Rules for using KAIRO CODE</span></div>
+        <span>›</span>
+      </div>
+      <div class="setting-item click" data-legal="data">
+        <div class="setting-icon">💾</div>
+        <div class="setting-text"><strong>Data & Storage</strong><span>What is saved on your device</span></div>
+        <span>›</span>
+      </div>
+      <div class="setting-item click" data-legal="disclaimer">
+        <div class="setting-icon">⚠</div>
+        <div class="setting-text"><strong>Disclaimer</strong><span>Limits and third-party services</span></div>
+        <span>›</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="setting-group">
+    <div class="setting-label">Support</div>
+    <div class="setting-card">
+      <a class="setting-item click" id="contactBtn" href="https://t.me/devxkairo" target="_blank" rel="noopener noreferrer" style="text-decoration:none;color:inherit">
+        <div class="setting-icon">✈</div>
+        <div class="setting-text"><strong>Contact Support</strong><span>Found a problem? Message @devxkairo on Telegram</span></div>
+        <span>›</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="setting-group">
+    <div class="setting-label">About</div>
+    <div class="setting-card">
+      <div class="setting-item">
+        <div class="setting-icon">K</div>
+        <div class="setting-text"><strong>KAIRO CODE</strong><span>Mobile Web Builder • V3.3</span></div>
+      </div>
+      <div class="setting-item click" id="aboutBtn">
+        <div class="setting-icon">i</div>
+        <div class="setting-text"><strong>About KAIRO DEV</strong><span>Learn about this project</span></div>
+        <span>›</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WEBSITE TO APP -->
+<section id="appPage" class="page settings-page">
+  <h1>Website → App</h1>
+  <p class="settings-sub">Turn your website link into a real installable app</p>
+
+  <input class="input" id="appUrl" placeholder="https://your-site.vercel.app" inputmode="url" autocapitalize="off" autocorrect="off">
+  <input class="input" id="appName" placeholder="App name" maxlength="30">
+  <input class="input" id="appShort" placeholder="Short name (max 12 letters)" maxlength="12">
+  <input class="input" id="appPackage" placeholder="Package name: com.yourname.app" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="60">
+  <input class="input" id="appRepo" placeholder="Site GitHub repo (optional): owner/repo" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="80">
+  <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px">
+    <span style="font-size:12px;color:#aeb9ca">App color</span>
+    <input type="color" id="appColor" value="#2563eb" style="width:48px;height:38px;border:0;background:none">
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px">
+    <div id="iconPreview" style="width:56px;height:56px;border-radius:14px;border:1px dashed #39465b;background:#0b0f16 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#78a9ff;font-size:20px;flex:none">🖼</div>
+    <button class="secondary-btn" id="pickIcon" style="flex:1">Choose icon from gallery</button>
+    <button class="row-btn danger" id="clearIcon" style="display:none" title="Remove">✕</button>
+  </div>
+  <input type="file" id="appIconFile" accept="image/*" style="display:none">
+  <button class="modal-create" id="appMake">⚙ Generate my app</button>
+  <div id="buildBox" style="display:none;margin:14px 0">
+    <div style="height:8px;border-radius:8px;background:#161d28;overflow:hidden"><div id="buildBar" style="height:100%;width:0;background:var(--grad);transition:width 1s linear"></div></div>
+    <p id="buildMsg" style="font-size:12px;color:#aeb9ca;margin-top:8px;line-height:1.5"></p>
+    <button class="modal-create" id="appDownload" style="display:none;margin-top:10px">⬇ Download my app</button>
+  </div>
+  <div id="linkBox" style="display:none;margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:15px;background:var(--card)">
+    <strong style="font-size:13px">One last step: hide the address bar</strong>
+    <p style="font-size:11px;color:#aeb9ca;line-height:1.6;margin:8px 0 10px">Put this file at <b>your-site/.well-known/assetlinks.json</b> (a folder named <b>.well-known</b> at the root of your site's repo), deploy, then uninstall and reinstall the app.</p>
+    <textarea class="input" id="linkText" readonly style="height:120px;resize:none;font:11px/1.5 'Courier New',monospace;white-space:pre"></textarea>
+    <div style="display:flex;gap:8px">
+      <button class="secondary-btn" id="linkCopy" style="flex:1">Copy</button>
+      <button class="secondary-btn" id="linkDownload" style="flex:1">⬇ File</button>
+    </div>
+  </div>
+
+  <p style="font-size:11px;color:#8993a3;line-height:1.6;margin-top:10px">The app opens your site in Chrome mode, so Google login works. Enter the GitHub repo of your site and KAIRO CODE adds the verification file for you, which removes the address bar. Your icon is uploaded automatically.</p>
+</section>
+
+<!-- LEGAL -->
+<section id="legalPage" class="page settings-page">
+  <button class="back-btn" id="legalBack" style="margin-bottom:14px">‹</button>
+  <h1 id="legalTitle"></h1>
+  <p class="settings-sub" id="legalDate"></p>
+  <div class="legal" id="legalBody"></div>
+</section>
+
+<!-- EDITOR -->
+<section id="editorPage" class="page editor-page">
+  <header class="editor-top">
+    <button class="back-btn" id="editorBack">‹</button>
+    <div class="editor-title">
+      <strong id="editorProjectName">My Website</strong>
+      <small id="editorCurrentFile">index.html</small>
+    </div>
+    <button class="run-main" id="runProjectBtn">▶ RUN</button>
+  </header>
+
+  <div class="file-bar" id="fileBar"></div>
+
+  <div class="editor-shell">
+    <div class="code-area">
+      <div class="line-numbers" id="lineNumbers"></div>
+      <textarea class="code-input" id="codeEditor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
+    </div>
+    <footer class="editor-footer">
+      <div class="editor-info"><span id="languageInfo">HTML</span> • <span id="lineInfo">1 line</span></div>
+      <div class="editor-tools">
+        <button class="editor-tool" id="copyCode">Copy</button>
+        <button class="editor-tool" id="clearCode">Clear</button>
+        <button class="editor-tool" id="saveCode">Save</button>
+        <button class="editor-tool danger" id="deleteFile">Delete</button>
+      </div>
+    </footer>
+  </div>
+</section>
+
+<!-- PREVIEW -->
+<section id="previewPage" class="page preview-page">
+  <header class="preview-top">
+    <button class="back-btn" id="previewBack">‹</button>
+    <div class="preview-title">
+      <strong id="previewProjectName">My Website</strong>
+      <small>Project Preview</small>
+    </div>
+    <div class="preview-actions">
+      <button class="preview-icon" id="exportProject" title="Export">⬇</button>
+      <button class="preview-icon" id="refreshProject">↻</button>
+      <button class="preview-icon" id="previewFullscreen">⛶</button>
+    </div>
+  </header>
+  <main class="preview-content">
+    <iframe id="projectPreview" class="preview-iframe" sandbox="allow-scripts allow-modals allow-forms"></iframe>
+  </main>
+</section>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-page="homePage"><span class="ic">⌂</span><span>Home</span></button>
+  <button class="nav-btn" data-page="filesPage"><span class="ic">▦</span><span>Projects</span></button>
+  <button class="nav-btn" id="navCreate"><span class="nav-plus">＋</span><span style="margin-top:3px">Create</span></button>
+  <button class="nav-btn" data-page="settingsPage"><span class="ic">⚙</span><span>Settings</span></button>
+</nav>
+
+<!-- NEW PROJECT MODAL -->
+<div class="modal-bg" id="projectModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>New Project</h2>
+      <button class="close-modal" id="closeProjectModal">×</button>
+    </div>
+    <input class="input" id="projectNameInput" placeholder="Project name" maxlength="40">
+    <button class="modal-create" id="createProjectConfirm">Create Project</button>
+  </div>
+</div>
+
+<!-- NEW FILE MODAL -->
+<div class="modal-bg" id="fileModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>New File</h2>
+      <button class="close-modal" id="closeFileModal">×</button>
+    </div>
+    <input class="input" id="fileNameInput" placeholder="example.html" maxlength="40">
+    <div class="file-type-grid">
+      <button class="type-btn selected" data-type="html">HTML</button>
+      <button class="type-btn" data-type="css">CSS</button>
+      <button class="type-btn" data-type="js">JS</button>
+    </div>
+    <button class="modal-create" id="createFileConfirm">Create File</button>
+  </div>
+</div>
+
+<div class="toast" id="toast">Saved</div>
+
+<script>
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const EXT = { html:".html", css:".css", js:".js" };
+const TYPE_BY_EXT = { html:"html", htm:"html", css:"css", js:"js" };
+
+function escapeHTML(t){
+    return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+}
+
+/* ---------- templates ---------- */
+const STYLE_CSS = `*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:Arial,sans-serif;
+    background:#080b12;
+    color:white;
+}
+
+.hero{
+    width:90%;
+    max-width:430px;
+    padding:35px;
+    text-align:center;
+    border-radius:24px;
+    background:#111827;
+    border:1px solid #27354c;
+    box-shadow:0 20px 70px rgba(0,0,0,.4);
+}
+
+.hero h1{
+    margin-top:0;
+}
+
+.hero p{
+    color:#94a3b8;
+}
+
+ul{
+    list-style:none;
+    padding:0;
+    margin:16px 0 0;
+    color:#cbd5e1;
+    line-height:2;
+}
+
+button{
+    margin-top:14px;
+    border:0;
+    padding:12px 20px;
+    border-radius:11px;
+    color:white;
+    background:#3b82f6;
+    cursor:pointer;
+}`;
+
+const SCRIPT_JS = `document.getElementById("startBtn").addEventListener("click", function(){
+    alert("Welcome to your website 🚀");
+});`;
+
+const PAGE_HEAD = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Website</title>
+</head>
+<body>
+`;
+
+const TEMPLATES = {
+    html: PAGE_HEAD + `
+<div class="hero">
+    <h1>Hello KAIRO 👋</h1>
+    <p>Build something amazing.</p>
+    <button id="startBtn">Get Started</button>
+</div>
+
+</body>
+</html>`,
+    landing: PAGE_HEAD + `
+<div class="hero">
+    <h1>Your Product 🚀</h1>
+    <p>A modern landing page, ready to edit.</p>
+    <ul>
+        <li>⚡ Fast</li>
+        <li>🎨 Beautiful</li>
+        <li>📱 Mobile first</li>
+    </ul>
+    <button id="startBtn">Get Started</button>
+</div>
+
+</body>
+</html>`
+};
+
+function newBlankFile(type){
+    if(type === "html") return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Page</title>
+</head>
+<body>
+
+<h1>New Page</h1>
+
+</body>
+</html>`;
+    if(type === "css") return `body{
+    margin:0;
+    font-family:Arial,sans-serif;
+}`;
+    return `console.log("KAIRO CODE");`;
+}
+
+/* ---------- state ---------- */
+let projects = [];
+let settings = {};
+try{ projects = JSON.parse(localStorage.getItem("kairo_projects") || "[]") || []; }catch(e){ projects = []; }
+try{ settings = JSON.parse(localStorage.getItem("kairo_settings") || "{}") || {}; }catch(e){ settings = {}; }
+
+let currentProject = null;
+let currentFile = "index.html";
+let selectedFileType = "html";
+let pendingTemplate = "html";
+let saveTimer = null;
+
+function persist(){
+    try{ localStorage.setItem("kairo_projects", JSON.stringify(projects)); }
+    catch(e){ showToast("Storage full or unavailable"); }
+}
+
+/* ---------- toast ---------- */
+const toast = $("toast");
+function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(window.toastTimer);
+    window.toastTimer = setTimeout(() => toast.classList.remove("show"), 2000);
+}
+
+/* ---------- navigation ---------- */
+const pages = document.querySelectorAll(".page");
+const navButtons = document.querySelectorAll(".nav-btn[data-page]");
+
+function showPage(id){
+    pages.forEach(p => p.classList.toggle("active", p.id === id));
+    navButtons.forEach(b => b.classList.toggle("active", b.dataset.page === id));
+    document.body.classList.toggle("no-nav", id === "editorPage" || id === "previewPage");
+    window.scrollTo(0, 0);
+}
+
+navButtons.forEach(b => b.addEventListener("click", () => showPage(b.dataset.page)));
+
+/* ---------- projects ---------- */
+function createProjectObject(name, template){
+    return {
+        id: Date.now().toString(),
+        name: name,
+        created: new Date().toLocaleString(),
+        files: {
+            "index.html": { type:"html", code: TEMPLATES[template] || TEMPLATES.html },
+            "style.css":  { type:"css",  code: STYLE_CSS },
+            "script.js":  { type:"js",   code: SCRIPT_JS }
+        }
+    };
+}
+
+function deleteProject(id){
+    const p = projects.find(x => x.id === id);
+    if(!p || !confirm('Delete "' + p.name + '" and all its files?')) return;
+    projects = projects.filter(x => x.id !== id);
+    if(currentProject && currentProject.id === id) currentProject = null;
+    persist();
+    renderProjects();
+    showToast("Project deleted");
+}
+
+function renderProjects(){
+    const grid = $("projectGrid");
+    const list = $("allProjects");
+    grid.innerHTML = "";
+    list.innerHTML = "";
+    $("emptyProjects").style.display = projects.length ? "none" : "block";
+
+    projects.slice().reverse().forEach(project => {
+        const count = Object.keys(project.files).length;
+
+        const card = document.createElement("div");
+        card.className = "project-card";
+        card.innerHTML = `
+            <div class="project-icon">&lt;/&gt;</div>
+            <div class="project-title">${escapeHTML(project.name)}</div>
+            <div class="project-meta">${count} files</div>
+            <button class="project-more" title="Delete">✕</button>`;
+        card.addEventListener("click", () => openProject(project.id));
+        card.querySelector(".project-more").addEventListener("click", e => {
+            e.stopPropagation();
+            deleteProject(project.id);
+        });
+        grid.appendChild(card);
+
+        const row = document.createElement("div");
+        row.className = "file-row";
+        row.innerHTML = `
+            <div class="file-big-icon">&lt;/&gt;</div>
+            <div class="file-row-info">
+                <div class="file-row-name">${escapeHTML(project.name)}</div>
+                <div class="file-row-meta">${count} files • ${escapeHTML(project.created)}</div>
+            </div>
+            <button class="row-btn danger" title="Delete">✕</button>
+            <button class="row-btn">›</button>`;
+        row.addEventListener("click", () => openProject(project.id));
+        row.querySelector(".danger").addEventListener("click", e => {
+            e.stopPropagation();
+            deleteProject(project.id);
+        });
+        list.appendChild(row);
+    });
+}
+
+/* project modal */
+function openProjectModal(template){
+    pendingTemplate = typeof template === "string" ? template : "html";
+    $("projectNameInput").value = pendingTemplate === "landing" ? "My Landing Page" : "My Website";
+    $("projectModal").classList.add("show");
+}
+function closeProjectModal(){ $("projectModal").classList.remove("show"); }
+
+["createProjectBtn","createProjectBtn2","navCreate","quickHtml"].forEach(id =>
+    $(id).addEventListener("click", () => openProjectModal("html")));
+$("quickLanding").addEventListener("click", () => openProjectModal("landing"));
+$("closeProjectModal").addEventListener("click", closeProjectModal);
+
+$("createProjectConfirm").addEventListener("click", () => {
+    const name = $("projectNameInput").value.trim() || "My Website";
+    const project = createProjectObject(name, pendingTemplate);
+    projects.push(project);
+    persist();
+    closeProjectModal();
+    renderProjects();
+    openProject(project.id);
+    showToast("Project created");
+});
+
+/* ---------- open project / file tabs ---------- */
+function openProject(id){
+    const project = projects.find(p => p.id === id);
+    if(!project) return;
+    currentProject = project;
+    currentFile = project.files["index.html"] ? "index.html" : Object.keys(project.files)[0];
+    $("editorProjectName").textContent = project.name;
+    renderFileTabs();
+    loadCurrentFile();
+    showPage("editorPage");
+}
+
+function renderFileTabs(){
+    const bar = $("fileBar");
+    bar.innerHTML = "";
+
+    Object.keys(currentProject.files).forEach(fileName => {
+        const file = currentProject.files[fileName];
+        const tab = document.createElement("button");
+        tab.className = "file-tab " + file.type + (fileName === currentFile ? " active" : "");
+        tab.innerHTML = `<b>●</b> ${escapeHTML(fileName)}`;
+        tab.addEventListener("click", () => {
+            saveCurrentFile();
+            currentFile = fileName;
+            renderFileTabs();
+            loadCurrentFile();
+        });
+        bar.appendChild(tab);
+    });
+
+    const add = document.createElement("button");
+    add.className = "new-file-small";
+    add.textContent = "+";
+    add.addEventListener("click", openFileModal);
+    bar.appendChild(add);
+
+    const active = bar.querySelector(".file-tab.active");
+    if(active) active.scrollIntoView({ inline:"nearest", block:"nearest" });
+}
+
+/* ---------- editor ---------- */
+const codeEditor = $("codeEditor");
+const lineNumbers = $("lineNumbers");
+
+function loadCurrentFile(){
+    const file = currentProject.files[currentFile];
+    if(!file) return;
+    codeEditor.value = file.code;
+    $("editorCurrentFile").textContent = currentFile;
+    $("languageInfo").textContent = file.type.toUpperCase();
+    updateLines();
+}
+
+function saveCurrentFile(){
+    clearTimeout(saveTimer);
+    if(!currentProject || !currentProject.files[currentFile]) return;
+    currentProject.files[currentFile].code = codeEditor.value;
+    persist();
+}
+
+function updateLines(){
+    const count = Math.max(1, codeEditor.value.split("\n").length);
+    let html = "";
+    for(let i = 1; i <= count; i++) html += i + "<br>";
+    lineNumbers.innerHTML = html;
+    $("lineInfo").textContent = count + (count === 1 ? " line" : " lines");
+    lineNumbers.scrollTop = codeEditor.scrollTop;
+}
+
+function onEdit(){
+    if(currentProject && currentProject.files[currentFile]){
+        currentProject.files[currentFile].code = codeEditor.value;
+    }
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(persist, 300);
+    updateLines();
+}
+
+codeEditor.addEventListener("input", onEdit);
+codeEditor.addEventListener("scroll", () => { lineNumbers.scrollTop = codeEditor.scrollTop; });
+
+codeEditor.addEventListener("keydown", function(e){
+    if(e.key === "Tab"){
+        e.preventDefault();
+        const s = this.selectionStart, en = this.selectionEnd;
+        this.value = this.value.substring(0, s) + "  " + this.value.substring(en);
+        this.selectionStart = this.selectionEnd = s + 2;
+        onEdit();
+    }
+    if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s"){
+        e.preventDefault();
+        saveCurrentFile();
+        showToast("File saved ✓");
+    }
+    if((e.ctrlKey || e.metaKey) && e.key === "Enter"){
+        e.preventDefault();
+        runProject();
+    }
+});
+
+$("editorBack").addEventListener("click", () => {
+    saveCurrentFile();
+    renderProjects();
+    showPage("homePage");
+});
+
+$("saveCode").addEventListener("click", () => {
+    saveCurrentFile();
+    showToast("File saved ✓");
+});
+
+$("copyCode").addEventListener("click", async () => {
+    try{
+        await navigator.clipboard.writeText(codeEditor.value);
+    }catch(e){
+        codeEditor.select();
+        document.execCommand("copy");
+    }
+    showToast("Code copied");
+});
+
+$("clearCode").addEventListener("click", () => {
+    if(!confirm("Clear this file?")) return;
+    codeEditor.value = "";
+    onEdit();
+    saveCurrentFile();
+    showToast("File cleared");
+});
+
+$("deleteFile").addEventListener("click", () => {
+    if(!currentProject) return;
+    const names = Object.keys(currentProject.files);
+    if(names.length <= 1){
+        showToast("Keep at least one file");
+        return;
+    }
+    if(!confirm('Delete "' + currentFile + '"?')) return;
+    delete currentProject.files[currentFile];
+    persist();
+    currentFile = Object.keys(currentProject.files)[0];
+    renderFileTabs();
+    loadCurrentFile();
+    showToast("File deleted");
+});
+
+/* ---------- new file ---------- */
+function openFileModal(){
+    $("fileNameInput").value = "";
+    $("fileModal").classList.add("show");
+}
+function closeFileModal(){ $("fileModal").classList.remove("show"); }
+
+$("closeFileModal").addEventListener("click", closeFileModal);
+
+document.querySelectorAll(".type-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.querySelectorAll(".type-btn").forEach(b => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        selectedFileType = btn.dataset.type;
+    });
+});
+
+$("createFileConfirm").addEventListener("click", () => {
+    let name = $("fileNameInput").value.trim().replace(/[\\/\s]+/g, "-");
+    if(!name) name = "new-file";
+
+    if(!name.includes(".")){
+        name += EXT[selectedFileType];
+    }
+
+    const ext = name.split(".").pop().toLowerCase();
+    const type = TYPE_BY_EXT[ext];
+    if(!type){
+        showToast("Use .html, .css or .js");
+        return;
+    }
+
+    if(currentProject.files[name]){
+        showToast("File already exists");
+        return;
+    }
+
+    saveCurrentFile();
+    currentProject.files[name] = { type:type, code:newBlankFile(type) };
+    persist();
+    closeFileModal();
+    currentFile = name;
+    renderFileTabs();
+    loadCurrentFile();
+    showToast(name + " created");
+});
+
+/* ---------- build / run / export ---------- */
+function buildProject(){
+    if(!currentProject) return "";
+    const files = Object.values(currentProject.files);
+
+    const htmlFile = currentProject.files["index.html"] || files.find(f => f.type === "html");
+    let html = htmlFile ? htmlFile.code : "<!DOCTYPE html><html><head></head><body></body></html>";
+
+    let css = "", js = "";
+    files.forEach(f => {
+        if(f.type === "css") css += "\n" + f.code + "\n";
+        if(f.type === "js")  js  += "\n" + f.code + "\n";
+    });
+
+    const style  = "<style>\n" + css + "\n</style>";
+    const script = "<script>\n" + js.replace(/<\/script>/gi, "<\\/script>") + "\n<\/script>";
+
+    /* function replacers: avoids special "$" patterns in the code being corrupted */
+    html = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, () => style + "\n</head>") : style + html;
+    html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, () => script + "\n</body>") : html + script;
+
+    return html;
+}
+
+function runProject(){
+    saveCurrentFile();
+    if(!currentProject) return;
+    $("previewProjectName").textContent = currentProject.name;
+    $("projectPreview").srcdoc = buildProject();
+    showPage("previewPage");
+}
+
+$("runProjectBtn").addEventListener("click", runProject);
+$("previewBack").addEventListener("click", () => showPage("editorPage"));
+
+$("refreshProject").addEventListener("click", () => {
+    if(!currentProject) return;
+    $("projectPreview").srcdoc = buildProject();
+    showToast("Preview refreshed");
+});
+
+$("previewFullscreen").addEventListener("click", () => {
+    const frame = $("projectPreview");
+    if(frame.requestFullscreen) frame.requestFullscreen();
+});
+
+$("exportProject").addEventListener("click", () => {
+    if(!currentProject) return;
+    const blob = new Blob([buildProject()], { type:"text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (currentProject.name.replace(/[^\w-]+/g, "-") || "project") + ".html";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast("Exported");
+});
+
+/* ---------- settings / misc ---------- */
+function applyFontSetting(){
+    const big = !!settings.largeText;
+    document.documentElement.style.setProperty("--fs", big ? "15px" : "13px");
+    $("fontToggle").classList.toggle("on", big);
+    updateLines();
+}
+
+$("fontToggle").addEventListener("click", () => {
+    settings.largeText = !settings.largeText;
+    try{ localStorage.setItem("kairo_settings", JSON.stringify(settings)); }catch(e){}
+    applyFontSetting();
+});
+
+$("settingsTop").addEventListener("click", () => showPage("settingsPage"));
+$("seeAll").addEventListener("click", () => showPage("filesPage"));
+$("filesHeroBtn").addEventListener("click", () => showPage("filesPage"));
+
+$("aboutBtn").addEventListener("click", () => {
+    alert("KAIRO CODE\n\nMobile Web Builder\n\nHTML • CSS • JavaScript\n\nCreate • Edit • Run • Export\n\nCreated by KAIRO DEV");
+});
+
+$("searchBtn").addEventListener("click", () => {
+    if(!projects.length){ showToast("No projects found"); return; }
+    const q = prompt("Search project:");
+    if(!q) return;
+    const result = projects.find(p => p.name.toLowerCase().includes(q.toLowerCase()));
+    if(result) openProject(result.id);
+    else showToast("Project not found");
+});
+
+/* close modals by tapping the dark background */
+document.querySelectorAll(".modal-bg").forEach(bg => {
+    bg.addEventListener("click", e => { if(e.target === bg) bg.classList.remove("show"); });
+});
+
+/* ---------- website -> app ---------- */
+function appValues(){
+    let url = $("appUrl").value.trim();
+    if(url && !/^https?:\/\//i.test(url)) url = "https://" + url;
+    try{
+        const u = new URL(url);
+        if(u.protocol !== "https:") throw 0;
+        const name = $("appName").value.trim() || u.hostname;
+        const short = ($("appShort").value.trim() || name).slice(0, 12);
+        return { url:u.origin + "/", name:name, short:short, color:$("appColor").value };
+    }catch(e){ return null; }
+}
+
+let appIconImg = null;
+
+function drawCover(g, img, x, y, w, h){
+    const r = Math.max(w / img.width, h / img.height);
+    const iw = img.width * r, ih = img.height * r;
+    g.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
+}
+
+let appIconInfo = null;
+
+/* find the real picture inside the photo (remove dark/transparent margins) and sample its edge colors */
+function analyzeIcon(img){
+    const N = 64;
+    const c = document.createElement("canvas");
+    c.width = c.height = N;
+    const g = c.getContext("2d", { willReadFrequently:true });
+    g.drawImage(img, 0, 0, N, N);
+    const d = g.getImageData(0, 0, N, N).data;
+    const px = (x, y) => { const i = (y * N + x) * 4; return [d[i], d[i+1], d[i+2], d[i+3]]; };
+    const bg = px(0, 0);
+    const diff = (a, b) => Math.abs(a[0]-b[0]) + Math.abs(a[1]-b[1]) + Math.abs(a[2]-b[2]);
+    let x0 = N, y0 = N, x1 = -1, y1 = -1;
+    for(let y = 0; y < N; y++){
+        for(let x = 0; x < N; x++){
+            const p = px(x, y);
+            const solid = bg[3] < 20 ? p[3] > 20 : (p[3] > 20 && diff(p, bg) > 60);
+            if(solid){ if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y; }
+        }
+    }
+    if(x1 < 0){ x0 = 0; y0 = 0; x1 = N - 1; y1 = N - 1; }
+    const k = img.width / N, kh = img.height / N;
+    let w = (x1 - x0 + 1) * k, h = (y1 - y0 + 1) * kh;
+    const side = Math.min(Math.max(w, h), Math.min(img.width, img.height));
+    const inset = side * 0.07;
+    let sx = x0 * k + w / 2 - side / 2 + inset;
+    let sy = y0 * kh + h / 2 - side / 2 + inset;
+    const sw = side - 2 * inset;
+    sx = Math.max(0, Math.min(img.width - sw, sx));
+    sy = Math.max(0, Math.min(img.height - sw, sy));
+    const m = Math.max(2, Math.round(N * 0.06));
+    const col = p => "rgb(" + p[0] + "," + p[1] + "," + p[2] + ")";
+    return {
+        sx:sx, sy:sy, sw:sw,
+        c1: col(px(Math.min(N-1, x0 + m), Math.min(N-1, y0 + m))),
+        c2: col(px(Math.max(0, x1 - m), Math.max(0, y1 - m)))
+    };
+}
+
+function renderIcon(size, maskable, letter, color){
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    const g = c.getContext("2d");
+    const grad = g.createLinearGradient(0, 0, size, size);
+
+    if(appIconImg && appIconInfo){
+        grad.addColorStop(0, appIconInfo.c1);
+        grad.addColorStop(1, appIconInfo.c2);
+        g.fillStyle = grad;
+        g.fillRect(0, 0, size, size);
+        const scale = maskable ? 0.7 : 0.8;
+        const w = size * scale, o = (size - w) / 2;
+        g.drawImage(appIconImg, appIconInfo.sx, appIconInfo.sy, appIconInfo.sw, appIconInfo.sw, o, o, w, w);
+    }else{
+        grad.addColorStop(0, color);
+        grad.addColorStop(1, "#7c3aed");
+        g.fillStyle = grad;
+        g.fillRect(0, 0, size, size);
+        g.fillStyle = "#fff";
+        g.textAlign = "center";
+        g.textBaseline = "middle";
+        g.font = "900 " + Math.round(size * (maskable ? 0.4 : 0.5)) + "px Arial, sans-serif";
+        g.fillText(letter, size / 2, size / 2 + size * 0.03);
+    }
+    return c.toDataURL("image/png");
+}
+
+$("pickIcon").addEventListener("click", () => $("appIconFile").click());
+
+$("appIconFile").addEventListener("change", e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    if(!file.type.startsWith("image/")){ showToast("Choose an image file"); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+            appIconImg = img;
+            appIconInfo = analyzeIcon(img);
+            const prev = $("iconPreview");
+            prev.style.backgroundImage = "url(" + reader.result + ")";
+            prev.textContent = "";
+            $("clearIcon").style.display = "block";
+            showToast("Icon selected ✓");
+        };
+        img.onerror = () => showToast("Cannot read this image");
+        img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+});
+
+$("clearIcon").addEventListener("click", () => {
+    appIconImg = null;
+    appIconInfo = null;
+    const prev = $("iconPreview");
+    prev.style.backgroundImage = "none";
+    prev.textContent = "🖼";
+    $("clearIcon").style.display = "none";
+});
+
+$("appMake").addEventListener("click", async () => {
+    const v = appValues();
+    const pkg = $("appPackage").value.trim().toLowerCase();
+    if(!v){ showToast("Enter a valid https:// link"); return; }
+    if(!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$/.test(pkg)){ showToast("Package example: com.yourname.app"); return; }
+
+    const letter = (v.short[0] || "K").toUpperCase();
+    const btn = $("appMake"), bar = $("buildBar"), msg = $("buildMsg"), dl = $("appDownload");
+    btn.disabled = true; btn.style.opacity = ".6";
+    dl.style.display = "none";
+    $("linkBox").style.display = "none";
+    $("buildBox").style.display = "block";
+    bar.style.width = "0";
+
+    const started = Date.now();
+    const TOTAL = 150;
+    const timer = setInterval(() => {
+        const t = Math.floor((Date.now() - started) / 1000);
+        bar.style.width = Math.min(95, t / TOTAL * 100) + "%";
+        const left = Math.max(0, TOTAL - t);
+        msg.textContent = t >= TOTAL ? "Almost done, please wait..." : "Building your app... about " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0") + " left";
+    }, 1000);
+
+    try{
+        const repo = $("appRepo").value.trim();
+        try{ localStorage.setItem("kairo_repo", repo); }catch(e){}
+        const r = await fetch("/api/build", {
+            method:"POST",
+            headers:{ "Content-Type":"application/json" },
+            body: JSON.stringify({
+                url:v.url, name:v.name, short:v.short, color:v.color, packageId:pkg, repo:repo,
+                icon: renderIcon(512, false, letter, v.color),
+                maskable: renderIcon(512, true, letter, v.color)
+            })
+        });
+        if(!r.ok) throw new Error((await r.text()).slice(0, 250));
+
+        const status = r.headers.get("X-Links-Status");
+        const note = decodeURIComponent(r.headers.get("X-Links-Note") || "");
+        const al = r.headers.get("X-Assetlinks");
+        const blob = await r.blob();
+        const href = URL.createObjectURL(blob);
+
+        clearInterval(timer);
+        bar.style.width = "100%";
+        if(status === "pushed"){
+            msg.textContent = "Your app is ready ✓ The verification file was added to " + note + ". Wait for that site to redeploy, uninstall the old app, then install this one.";
+        }else{
+            msg.textContent = "Your app is ready ✓" + (note ? " (auto-add failed: " + note + ")" : "");
+            if(al){
+                try{ $("linkText").value = atob(al); $("linkBox").style.display = "block"; }catch(e){}
+            }
+        }
+        dl.style.display = "block";
+        dl.onclick = () => {
+            const a = document.createElement("a");
+            a.href = href; a.download = pkg + ".zip";
+            document.body.appendChild(a); a.click(); a.remove();
+        };
+    }catch(e){
+        clearInterval(timer);
+        bar.style.width = "0";
+        msg.textContent = "Build failed: " + e.message;
+    }
+    btn.disabled = false; btn.style.opacity = "1";
+});
+
+$("linkCopy").addEventListener("click", async () => {
+    const t = $("linkText");
+    if(!t.value){ showToast("Nothing to copy"); return; }
+    try{ await navigator.clipboard.writeText(t.value); }
+    catch(e){ t.select(); document.execCommand("copy"); }
+    showToast("Copied");
+});
+
+$("linkDownload").addEventListener("click", () => {
+    const t = $("linkText").value;
+    if(!t){ showToast("Nothing to download"); return; }
+    const url = URL.createObjectURL(new Blob([t], { type:"application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "assetlinks.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+try{ $("appRepo").value = localStorage.getItem("kairo_repo") || ""; }catch(e){}
+$("quickApp").addEventListener("click", () => showPage("appPage"));
+
+/* ---------- legal pages ---------- */
+const LEGAL_DATE = "Last updated: October 14, 2026";
+const CONTACT = '<a href="https://t.me/devxkairo" target="_blank" rel="noopener noreferrer">t.me/devxkairo</a>';
+const LEGAL = {
+    privacy: { title:"Privacy Policy", body:`
+<h2>1. Who we are</h2>
+<p>KAIRO CODE is a mobile web builder made by KAIRO DEV. Contact: ${CONTACT}</p>
+<h2>2. What is saved and where</h2>
+<p>Your projects, files and settings are saved only on your own device, in your browser or app storage. KAIRO CODE has no user accounts, and we do not upload your projects to our servers. If you clear the app data, your projects are deleted.</p>
+<h2>3. Information we collect</h2>
+<p>KAIRO CODE does not collect personal information. At the time of writing it contains no ads, no analytics and no tracking tools.</p>
+<h2>4. Website → App feature</h2>
+<p>When you tap "Generate my app", the website link, app name, short name, color and package name you typed are sent to our server function and to the PWABuilder build service in order to create your app package. We do not keep this information.</p>
+<h2>5. Hosting and third parties</h2>
+<p>The site is hosted on Vercel, which may process standard technical logs such as IP address and device type. Links to Telegram and PWABuilder are governed by their own policies.</p>
+<h2>6. Your code</h2>
+<p>The preview runs your code inside a sandboxed frame on your device. If your own code contacts other websites, those websites receive that data and their policies apply.</p>
+<h2>7. Children</h2>
+<p>KAIRO CODE is not directed to children under 13 and we do not knowingly collect data from them.</p>
+<h2>8. Your choices</h2>
+<p>You can delete any project or file inside the app, or clear the app data in your device settings, at any time.</p>
+<h2>9. Changes and contact</h2>
+<p>We may update this policy and will change the date above. Questions: ${CONTACT}</p>` },
+
+    terms: { title:"Terms of Use", body:`
+<h2>1. Acceptance</h2>
+<p>By using KAIRO CODE you agree to these terms. If you do not agree, please stop using the app.</p>
+<h2>2. Your content</h2>
+<p>You own the websites and code you create. You are responsible for what you build, publish and share.</p>
+<h2>3. Acceptable use</h2>
+<ul><li>Do not use KAIRO CODE for illegal activity, fraud, malware or harassment.</li><li>Do not build content that violates the rights of others.</li><li>Do not abuse the Website → App feature or try to overload it.</li></ul>
+<h2>4. Generated apps</h2>
+<p>If you publish an app made with the Website → App feature, you are responsible for following the rules of the store where you publish it (for example Google Play), and for keeping your signing key safe.</p>
+<h2>5. No warranty</h2>
+<p>KAIRO CODE is provided "as is", without warranty of any kind. We do not guarantee that it will be error-free, always available, or that your data will never be lost.</p>
+<h2>6. Limitation of liability</h2>
+<p>To the maximum extent allowed by law, KAIRO DEV is not liable for any loss or damage resulting from the use of the app.</p>
+<h2>7. Changes and contact</h2>
+<p>We may update these terms and will change the date above. Questions: ${CONTACT}</p>` },
+
+    data: { title:"Data & Storage", body:`
+<h2>What is saved on your device</h2>
+<ul><li><b>kairo_projects</b>: your projects and their files.</li><li><b>kairo_settings</b>: your settings, such as large text.</li><li><b>kairo_seeded</b>: remembers that the first sample project was created.</li><li><b>App cache</b>: a copy of the app files so it can open offline.</li></ul>
+<h2>What is not saved</h2>
+<p>No account, no password, no location, no contacts. Photos you choose for an app icon are used only on your device to create the icon files.</p>
+<h2>How to delete everything</h2>
+<p>Delete projects with the ✕ button, delete files with the Delete button in the editor, or clear the site/app data in your device or browser settings.</p>
+<h2>Backups</h2>
+<p>Because data lives only on your device, use Export in the preview page to keep a copy of your websites.</p>` },
+
+    disclaimer: { title:"Disclaimer", body:`
+<h2>General</h2>
+<p>KAIRO CODE is a tool for learning and building simple websites. Results depend on your code and your device.</p>
+<h2>Third-party services</h2>
+<p>The Website → App feature uses the PWABuilder build service and Vercel hosting. We do not control these services and they may change or be unavailable.</p>
+<h2>Trademarks</h2>
+<p>KAIRO CODE is not affiliated with or endorsed by Google, Android, Google Play, Microsoft, Vercel or Telegram. All trademarks belong to their owners.</p>
+<h2>Backups and keys</h2>
+<p>You are responsible for keeping backups of your projects and the signing key of any app you generate.</p>
+<h2>Contact</h2>
+<p>${CONTACT}</p>` }
+};
+
+function openLegal(key){
+    const d = LEGAL[key];
+    if(!d) return;
+    $("legalTitle").textContent = d.title;
+    $("legalDate").textContent = LEGAL_DATE;
+    $("legalBody").innerHTML = d.body;
+    showPage("legalPage");
+    try{ history.replaceState(null, "", "#" + key); }catch(e){}
+}
+
+document.querySelectorAll("[data-legal]").forEach(el => {
+    el.addEventListener("click", e => { e.preventDefault(); openLegal(el.dataset.legal); });
+});
+
+$("legalBack").addEventListener("click", () => {
+    showPage("settingsPage");
+    try{ history.replaceState(null, "", location.pathname); }catch(e){}
+});
+
+/* ---------- install as app (PWA) ---------- */
+let deferredPrompt = null;
+window.addEventListener("beforeinstallprompt", e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    $("installGroup").style.display = "block";
+});
+$("installBtn").addEventListener("click", async () => {
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    $("installGroup").style.display = "none";
+});
+window.addEventListener("appinstalled", () => {
+    $("installGroup").style.display = "none";
+    showToast("App installed ✓");
+});
+if("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
+    window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+}
+
+/* ---------- init ---------- */
+if(!projects.length && !localStorage.getItem("kairo_seeded")){
+    projects.push(createProjectObject("My First Website", "html"));
+    persist();
+    try{ localStorage.setItem("kairo_seeded", "1"); }catch(e){}
+}
+
+applyFontSetting();
+renderProjects();
+if(LEGAL[location.hash.slice(1)]) openLegal(location.hash.slice(1));
+</script>
+</body>
+</html>
