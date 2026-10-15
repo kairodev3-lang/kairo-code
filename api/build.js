@@ -165,6 +165,25 @@ module.exports = async function handler(req, res) {
       if (p.ok) { status = "pushed"; note = p.note; } else { note = p.note; }
     } catch (e) { note = e.message; }
   }
+  /* check that the site really serves the file with this build's key (the address bar only goes away if it does) */
+  let live = "no";
+  if (links) {
+    let want = [];
+    try { want = JSON.parse(links).flatMap(x => (x.target && x.target.package_name === packageId && x.target.sha256_cert_fingerprints) || []); } catch (e) {}
+    const until = Date.now() + (status === "pushed" ? 100000 : 8000);
+    while (want.length) {
+      try {
+        const r = await fetch(site + "/.well-known/assetlinks.json?t=" + Date.now(), { cache: "no-store", redirect: "follow" });
+        if (r.ok) {
+          const t = await r.text();
+          if (want.every(f => t.includes(f)) && t.includes(packageId)) { live = "yes"; break; }
+        }
+      } catch (e) {}
+      if (Date.now() > until) break;
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  }
+  res.setHeader("X-Links-Live", live);
   if (links) res.setHeader("X-Assetlinks", Buffer.from(links).toString("base64"));
   res.setHeader("X-Links-Status", status);
   res.setHeader("X-Links-Note", encodeURIComponent(note));
