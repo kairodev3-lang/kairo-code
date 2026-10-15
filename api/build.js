@@ -1,198 +1,239 @@
-const { Readable } = require("node:stream");
-const zlib = require("node:zlib");
-const { gh } = require("./_gh");
+# Builds the SYNAPSE AI Android app (APK) in the cloud. File location: .github/workflows/build-android.yml
+# Run it from GitHub: Actions > Build Android app > Run workflow.
+name: Build Android app
 
-module.exports.config = { maxDuration: 300 };
+on:
+  workflow_dispatch:
+    inputs:
+      site_url:
+        description: "Website link (must start with https://)"
+        required: true
+        default: "https://kairo-gpt.vercel.app"
+      app_name:
+        description: "App name (the name you want under the app icon)"
+        required: true
+        default: "SYNAPSE AI"
+      package_id:
+        description: "Package id (keep com.kairo.synapse for SYNAPSE AI, Google login depends on it)"
+        required: true
+        default: "com.kairo.synapse"
 
-/* read one file out of a zip held in memory */
-function zipFind(buf, suffix) {
-  let e = buf.length - 22;
-  while (e >= 0 && buf.readUInt32LE(e) !== 0x06054b50) e--;
-  if (e < 0) return null;
-  const count = buf.readUInt16LE(e + 10);
-  let p = buf.readUInt32LE(e + 16);
-  for (let i = 0; i < count; i++) {
-    if (buf.readUInt32LE(p) !== 0x02014b50) break;
-    const method = buf.readUInt16LE(p + 10);
-    const csize = buf.readUInt32LE(p + 20);
-    const nl = buf.readUInt16LE(p + 28), el = buf.readUInt16LE(p + 30), cl = buf.readUInt16LE(p + 32);
-    const off = buf.readUInt32LE(p + 42);
-    const name = buf.toString("utf8", p + 46, p + 46 + nl);
-    if (name.toLowerCase().endsWith(suffix)) {
-      const start = off + 30 + buf.readUInt16LE(off + 26) + buf.readUInt16LE(off + 28);
-      const data = buf.subarray(start, start + csize);
-      return (method === 0 ? data : zlib.inflateRawSync(data)).toString("utf8");
-    }
-    p += 46 + nl + el + cl;
-  }
-  return null;
-}
+permissions:
+  contents: write
 
-/* add or update .well-known/assetlinks.json in the site's GitHub repo */
-async function pushAssetlinks(repoInput, pkg, newText) {
-  let repo = String(repoInput || "").trim().replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "");
-  if (!/^[\w.-]+(\/[\w.-]+)?$/.test(repo)) return { ok: false, note: "Invalid GitHub repo" };
-  if (!process.env.GH_TOKEN) return { ok: false, note: "GH_TOKEN is not set in Vercel" };
-  if (!repo.includes("/")) {
-    const u = await gh("/user");
-    if (!u.ok) return { ok: false, note: "GH_TOKEN is not valid" };
-    repo = (await u.json()).login + "/" + repo;
-  }
-  const path = "/repos/" + repo + "/contents/.well-known/assetlinks.json";
-  let sha, list = [], old = [];
-  const cur = await gh(path);
-  if (cur.ok) {
-    const j = await cur.json();
-    sha = j.sha;
-    try {
-      const arr = JSON.parse(Buffer.from(j.content, "base64").toString("utf8"));
-      if (Array.isArray(arr)) {
-        list = arr.filter(x => !(x && x.target && x.target.package_name === pkg));
-        /* keep the fingerprints of earlier builds of the same app: every build makes a new signing key,
-           and replacing the old one would bring the address bar back on apps installed from older builds */
-        arr.forEach(x => {
-          if (x && x.target && x.target.package_name === pkg && Array.isArray(x.target.sha256_cert_fingerprints)) old.push(...x.target.sha256_cert_fingerprints);
-        });
-      }
-    } catch (e) {}
-  } else if (cur.status !== 404) {
-    return { ok: false, note: "Cannot open " + repo + " (" + cur.status + ")" };
-  }
-  let mine = [];
-  try { mine = JSON.parse(newText); } catch (e) { return { ok: false, note: "assetlinks.json is not valid" }; }
-  mine.forEach(m => {
-    if (m && m.target && m.target.package_name === pkg) {
-      const all = Array.from(new Set((m.target.sha256_cert_fingerprints || []).concat(old)));
-      m.target.sha256_cert_fingerprints = all.slice(-10);
-    }
-  });
-  const body = { message: "Add app verification file (Kairo Code)", content: Buffer.from(JSON.stringify(list.concat(mine), null, 2)).toString("base64") };
-  if (sha) body.sha = sha;
-  const put = await gh(path, { method: "PUT", body: JSON.stringify(body) });
-  return put.ok ? { ok: true, note: repo } : { ok: false, note: "GitHub refused the file (" + put.status + "). The token needs write access to " + repo };
-}
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SITE_URL: ${{ inputs.site_url }}
+      APP_NAME: ${{ inputs.app_name }}
+      PKG: ${{ inputs.package_id }}
+    steps:
+      - uses: actions/checkout@v4
 
-module.exports = async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).send("POST only");
+      - name: Check the Android files
+        run: |
+          if [ ! -f android-app/package.json ] || [ ! -f android-app/capacitor.config.json ]; then
+            echo "::error::android-app/package.json or android-app/capacitor.config.json is missing. Add them from the kairo-code zip."
+            exit 1
+          fi
+          mkdir -p android-app/www
+          [ -f android-app/www/index.html ] || printf '<!DOCTYPE html><html><body>SYNAPSE AI</body></html>' > android-app/www/index.html
 
-  let b = req.body || {};
-  if (typeof b === "string") { try { b = JSON.parse(b); } catch (e) { b = {}; } }
-  const { url, name, short, color, packageId, icon, maskable } = b;
-  const repo = b.repo || process.env.SITE_REPO || "";
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-  if (!/^https:\/\/[^\s/]+\/?$/.test(url || "")) return res.status(400).send("Invalid site link");
-  if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$/.test(packageId || "")) return res.status(400).send("Invalid package name");
-  if (!/^#[0-9a-fA-F]{6}$/.test(color || "")) return res.status(400).send("Invalid color");
-  const okPng = d => typeof d === "string" && d.length < 3500000 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(d);
-  if (!okPng(icon) || !okPng(maskable)) return res.status(400).send("Icon missing or too large");
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
 
-  const appName = String(name || "").replace(/[^\p{L}\p{N} ._-]/gu, "").trim().slice(0, 30) || "App";
-  const u = new URL(url);
-  const site = u.origin;
+      - name: Signing key (made once, then reused so Google login keeps working)
+        run: |
+          set -e
+          if [ ! -f android-app/synapse-debug.keystore ]; then
+            keytool -genkeypair -keystore android-app/synapse-debug.keystore -storepass android -keypass android \
+              -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=SYNAPSE AI, O=KAIRO, C=HT"
+          fi
+          mkdir -p ~/.android
+          cp android-app/synapse-debug.keystore ~/.android/debug.keystore
+          # keep the key and the Android folder away from the public website
+          touch .vercelignore
+          grep -qx 'android-app' .vercelignore || echo 'android-app' >> .vercelignore
+          grep -qx '.github' .vercelignore || echo '.github' >> .vercelignore
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add -f android-app/synapse-debug.keystore .vercelignore
+          git diff --cached --quiet || { git commit -m "Android signing key"; git pull --rebase --autostash; git push; }
+          KEYINFO=$(keytool -list -v -keystore android-app/synapse-debug.keystore -storepass android)
+          SHA1=$(echo "$KEYINFO" | awk '/SHA1:/ {print $2; exit}')
+          SHA256=$(echo "$KEYINFO" | awk '/SHA256:/ {print $2; exit}')
+          {
+            echo "## Put these in Firebase (Project settings > Your apps > Android)"
+            echo ""
+            echo "Package name: \`$PKG\`"
+            echo ""
+            echo "SHA-1: \`$SHA1\`"
+            echo ""
+            echo "SHA-256: \`$SHA256\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-  /* host icons + a manifest on Blob (PWABuilder downloads them by link) */
-  const tokenKey = Object.keys(process.env).find(k => k === "BLOB_READ_WRITE_TOKEN" || k.endsWith("_READ_WRITE_TOKEN"));
-  const token = tokenKey ? process.env[tokenKey] : "";
-  if (!token && !process.env.BLOB_STORE_ID) return res.status(500).send("Blob storage is not connected to this Vercel project.");
+      - name: Site verification file (this is what removes the address bar)
+        run: |
+          set -e
+          SHA256=$(keytool -list -v -keystore android-app/synapse-debug.keystore -storepass android | awk '/SHA256:/ {print $2; exit}')
+          mkdir -p .well-known
+          PKG="$PKG" FP="$SHA256" node -e '
+            const fs = require("fs"), p = ".well-known/assetlinks.json";
+            let a = [];
+            try { a = JSON.parse(fs.readFileSync(p, "utf8")); if (!Array.isArray(a)) a = []; } catch (e) {}
+            let fps = [process.env.FP];
+            a = a.filter(x => {
+              const t = x && x.target;
+              if (t && t.package_name === process.env.PKG) { fps = fps.concat(t.sha256_cert_fingerprints || []); return false; }
+              return true;
+            });
+            a.push({ relation: ["delegate_permission/common.handle_all_urls"],
+              target: { namespace: "android_app", package_name: process.env.PKG, sha256_cert_fingerprints: Array.from(new Set(fps)) } });
+            fs.writeFileSync(p, JSON.stringify(a, null, 2));
+          '
+          cat .well-known/assetlinks.json
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add -f .well-known/assetlinks.json
+          git diff --cached --quiet || { git commit -m "Update assetlinks.json"; git pull --rebase --autostash; git push; }
 
-  let iconUrl, maskableIconUrl, manifestUrl = "";
-  try {
-    const m = await fetch(site + "/manifest.webmanifest");
-    if (m.body) m.body.cancel();
-    if (m.ok) manifestUrl = site + "/manifest.webmanifest";
-  } catch (e) {}
+      - name: Set the app name and website link
+        run: |
+          set -e
+          case "$SITE_URL" in
+            https://*) ;;
+            *) echo "::error::The website link must start with https://"; exit 1 ;;
+          esac
+          if ! echo "$PKG" | grep -qE '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'; then
+            echo "::error::Package id is not valid. Use something like com.kairo.synapse (lowercase letters, numbers and dots)."
+            exit 1
+          fi
+          SITE_URL="${SITE_URL%/}"
+          NAME=$(echo "$APP_NAME" | sed -E "s/[<>&\"'\\\\]//g; s/^ +//; s/ +$//")
+          [ -n "$NAME" ] || NAME="SYNAPSE AI"
+          NAME="${NAME:0:30}"
+          HOST=$(echo "$SITE_URL" | sed -E 's#https://([^/]+).*#\1#')
+          case "$SITE_URL" in
+            *\?*) START="$SITE_URL&app=1" ;;
+            *) START="$SITE_URL/?app=1" ;;
+          esac
+          echo "App name: $NAME"
+          echo "Opens: $START"
+          NAME="$NAME" START="$START" HOST="$HOST" node -e '
+            const fs = require("fs"), p = "android-app/capacitor.config.json";
+            const c = JSON.parse(fs.readFileSync(p, "utf8"));
+            c.appName = process.env.NAME;
+            c.appId = process.env.PKG;
+            c.server.url = process.env.START;
+            c.server.allowNavigation = [process.env.HOST, "accounts.google.com", "*.google.com", "*.googleapis.com", "*.gstatic.com", "*.firebaseapp.com"];
+            c.server.androidScheme = "https";
+            c.server.cleartext = false;
+            fs.writeFileSync(p, JSON.stringify(c, null, 2));
+            const h = "android-app/www/index.html";
+            fs.writeFileSync(h, fs.readFileSync(h, "utf8").split("https://kairo-gpt.vercel.app/?app=1").join(process.env.START));
+          '
+          {
+            echo "## App"
+            echo ""
+            echo "Name: **$NAME**"
+            echo ""
+            echo "Opens: $START"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-  try {
-    const { put } = await import("@vercel/blob");
-    const stamp = Date.now().toString(36);
-    const opt = ct => ({ access: "public", contentType: ct, addRandomSuffix: true, ...(token ? { token } : {}) });
-    const up = async (d, n) => (await put("icons/" + stamp + "-" + n + ".png", Buffer.from(d.split(",")[1], "base64"), opt("image/png"))).url;
-    iconUrl = await up(icon, "icon");
-    maskableIconUrl = await up(maskable, "maskable");
-    if (!manifestUrl) {
-      const manifest = {
-        name: appName, short_name: (short || appName).slice(0, 12),
-        start_url: site + "/", scope: site + "/", display: "standalone",
-        background_color: "#07090d", theme_color: color,
-        icons: [
-          { src: iconUrl, sizes: "512x512", type: "image/png", purpose: "any" },
-          { src: maskableIconUrl, sizes: "512x512", type: "image/png", purpose: "maskable" }
-        ]
-      };
-      manifestUrl = (await put("manifests/" + stamp + ".webmanifest", JSON.stringify(manifest), opt("application/manifest+json"))).url;
-    }
-  } catch (e) {
-    return res.status(500).send("Upload failed: " + e.message);
-  }
+      - name: Install
+        working-directory: android-app
+        run: npm install --legacy-peer-deps
 
-  const options = {
-    packageId, name: appName, launcherName: (short || appName).slice(0, 12),
-    appVersion: "1.0.0.0", appVersionCode: 1,
-    host: u.host, startUrl: "/", fullScopeUrl: site + "/", pwaUrl: site + "/",
-    webManifestUrl: manifestUrl, iconUrl, maskableIconUrl, monochromeIconUrl: null,
-    themeColor: color, navigationColor: "#07090d", navigationColorDark: "#07090d",
-    navigationDividerColor: "#07090d", navigationDividerColorDark: "#07090d",
-    backgroundColor: "#07090d", display: "standalone", orientation: "default",
-    fallbackType: "customtabs", signingMode: "new",
-    signing: { file: null, alias: "key", fullName: appName, organization: appName, organizationalUnit: "Dev", countryCode: "US", keyPassword: "", storePassword: "" },
-    enableNotifications: false, enableSiteSettingsShortcut: false, isChromeOSOnly: false, includeSourceCode: false,
-    splashScreenFadeOutDuration: 100, shortcuts: [], additionalTrustedOrigins: [],
-    features: { locationDelegation: { enabled: false }, playBilling: { enabled: false } },
-    minSdkVersion: 21, generator: "pwabuilder"
-  };
+      - name: Create the Android project
+        working-directory: android-app
+        run: npx cap add android
 
-  let zip;
-  try {
-    const r = await fetch("https://pwabuilder-cloudapk.azurewebsites.net/generateAppPackage", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(options)
-    });
-    if (!r.ok) {
-      const t = await r.text();
-      return res.status(502).send("Build service error " + r.status + ": " + t.slice(0, 300));
-    }
-    zip = Buffer.from(await r.arrayBuffer());
-  } catch (e) {
-    return res.status(500).send("Build failed: " + e.message);
-  }
+      - name: Firebase file and permissions
+        run: |
+          if [ -f android-app/google-services.json ]; then
+            cp android-app/google-services.json android-app/android/app/google-services.json
+            echo "google-services.json found"
+          else
+            echo "::warning::android-app/google-services.json is missing. The app will build, but Google login will not work yet."
+            mkdir -p android-app/android/app/src/main/res/values
+            printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="default_web_client_id" translatable="false">missing-google-services-json</string>\n</resources>\n' > android-app/android/app/src/main/res/values/synapse_placeholder.xml
+          fi
+          MANIFEST=android-app/android/app/src/main/AndroidManifest.xml
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#&\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />#' "$MANIFEST"
+          grep -n "uses-permission" "$MANIFEST"
 
-  /* the verification file that removes the address bar */
-  let links = null;
-  try { links = zipFind(zip, "assetlinks.json"); } catch (e) {}
-  let status = "manual", note = "";
-  if (links && repo) {
-    try {
-      const p = await pushAssetlinks(repo, packageId, links);
-      if (p.ok) { status = "pushed"; note = p.note; } else { note = p.note; }
-    } catch (e) { note = e.message; }
-  }
-  /* check that the site really serves the file with this build's key (the address bar only goes away if it does) */
-  let live = "no";
-  if (links) {
-    let want = [];
-    try { want = JSON.parse(links).flatMap(x => (x.target && x.target.package_name === packageId && x.target.sha256_cert_fingerprints) || []); } catch (e) {}
-    const until = Date.now() + (status === "pushed" ? 100000 : 8000);
-    while (want.length) {
-      try {
-        const r = await fetch(site + "/.well-known/assetlinks.json?t=" + Date.now(), { cache: "no-store", redirect: "follow" });
-        if (r.ok) {
-          const t = await r.text();
-          if (want.every(f => t.includes(f)) && t.includes(packageId)) { live = "yes"; break; }
-        }
-      } catch (e) {}
-      if (Date.now() > until) break;
-      await new Promise(r => setTimeout(r, 5000));
-    }
-  }
-  res.setHeader("X-Links-Live", live);
-  if (links) res.setHeader("X-Assetlinks", Buffer.from(links).toString("base64"));
-  res.setHeader("X-Links-Status", status);
-  res.setHeader("X-Links-Note", encodeURIComponent(note));
-  res.setHeader("Content-Type", "application/zip");
-  res.setHeader("Content-Disposition", 'attachment; filename="' + packageId + '.zip"');
+      - name: App icon (sharp, made from your logo)
+        continue-on-error: true
+        run: |
+          # 1) best: your own 1024x1024 PNG at android-app/assets/icon-only.png
+          # 2) else icon-1024 / icon-512 / icon-192 from the repo, 3) else from the website
+          SRC=""
+          for f in android-app/assets/icon-only.png icon-1024.png icon-512.png icon-192.png; do
+            if [ -f "$f" ]; then SRC="$f"; break; fi
+          done
+          if [ -z "$SRC" ]; then
+            for n in icon-1024.png icon-512.png icon-192.png; do
+              if curl -fsSL --max-time 20 "${SITE_URL%/}/$n" -o /tmp/site-icon.png; then SRC=/tmp/site-icon.png; break; fi
+            done
+          fi
+          if [ -z "$SRC" ]; then
+            echo "::warning::No logo found, the default icon is used. Add a 1024x1024 PNG at android-app/assets/icon-only.png"
+            exit 0
+          fi
+          IM=$(command -v convert || command -v magick)
+          echo "Logo source: $SRC ($(identify "$SRC" | awk '{print $3}'))"
+          mkdir -p android-app/assets
+          # square, 1024 px, sharpened
+          "$IM" "$SRC" -background none -gravity center -filter Lanczos -resize 1024x1024 -extent 1024x1024 -unsharp 0x0.8 /tmp/logo1024.png
+          cp /tmp/logo1024.png android-app/assets/icon-only.png
+          # adaptive icon: big logo in the safe zone, on a dark tile
+          "$IM" -size 1024x1024 xc:none \( /tmp/logo1024.png -resize 760x760 \) -gravity center -composite android-app/assets/icon-foreground.png
+          "$IM" -size 1024x1024 xc:'#0b1226' android-app/assets/icon-background.png
+          cd android-app
+          npx --yes @capacitor/assets generate --android || echo "::warning::The icon tool failed, so the default icon is used."
+          COUNT=$(ls android/app/src/main/res/mipmap-*/ic_launcher*.png 2>/dev/null | wc -l)
+          {
+            echo "## Icon"
+            echo ""
+            echo "Logo used: \`$SRC\` ($(identify /tmp/logo1024.png | awk '{print $3}') after resize)"
+            echo ""
+            echo "Icon files made: $COUNT"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$COUNT" -eq 0 ]; then echo "::warning::No icon files were made, so the default icon is used."; fi
 
-  const chunks = [];
-  for (let i = 0; i < zip.length; i += 262144) chunks.push(zip.subarray(i, i + 262144));
-  Readable.from(chunks).pipe(res);
-};
+      - name: Sync
+        working-directory: android-app
+        run: npx cap sync android
 
-module.exports.config = { maxDuration: 300 };
+      - name: Accept Android licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Build the APK
+        working-directory: android-app/android
+        run: |
+          chmod +x gradlew
+          mkdir -p ~/.gradle
+          echo "org.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8" >> ~/.gradle/gradle.properties
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Name the file
+        run: cp android-app/android/app/build/outputs/apk/debug/app-debug.apk synapse-ai-2.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SYNAPSE-AI-apk
+          path: synapse-ai-2.apk
+
+      - name: Put the APK on the website (the download banner uses it)
+        run: |
+          git add -f synapse-ai-2.apk
+          git diff --cached --quiet || { git commit -m "New Android app build"; git pull --rebase --autostash; git push; }
