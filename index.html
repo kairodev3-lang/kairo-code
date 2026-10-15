@@ -1169,7 +1169,7 @@ $("appMake").addEventListener("click", async () => {
     bar.style.width = "0";
 
     const started = Date.now();
-    const TOTAL = 150;
+    const TOTAL = 60;
     const timer = setInterval(() => {
         const t = Math.floor((Date.now() - started) / 1000);
         bar.style.width = Math.min(95, t / TOTAL * 100) + "%";
