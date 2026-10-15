@@ -39,20 +39,33 @@ async function pushAssetlinks(repoInput, pkg, newText) {
     repo = (await u.json()).login + "/" + repo;
   }
   const path = "/repos/" + repo + "/contents/.well-known/assetlinks.json";
-  let sha, list = [];
+  let sha, list = [], old = [];
   const cur = await gh(path);
   if (cur.ok) {
     const j = await cur.json();
     sha = j.sha;
     try {
       const arr = JSON.parse(Buffer.from(j.content, "base64").toString("utf8"));
-      if (Array.isArray(arr)) list = arr.filter(x => !(x && x.target && x.target.package_name === pkg));
+      if (Array.isArray(arr)) {
+        list = arr.filter(x => !(x && x.target && x.target.package_name === pkg));
+        /* keep the fingerprints of earlier builds of the same app: every build makes a new signing key,
+           and replacing the old one would bring the address bar back on apps installed from older builds */
+        arr.forEach(x => {
+          if (x && x.target && x.target.package_name === pkg && Array.isArray(x.target.sha256_cert_fingerprints)) old.push(...x.target.sha256_cert_fingerprints);
+        });
+      }
     } catch (e) {}
   } else if (cur.status !== 404) {
     return { ok: false, note: "Cannot open " + repo + " (" + cur.status + ")" };
   }
   let mine = [];
   try { mine = JSON.parse(newText); } catch (e) { return { ok: false, note: "assetlinks.json is not valid" }; }
+  mine.forEach(m => {
+    if (m && m.target && m.target.package_name === pkg) {
+      const all = Array.from(new Set((m.target.sha256_cert_fingerprints || []).concat(old)));
+      m.target.sha256_cert_fingerprints = all.slice(-10);
+    }
+  });
   const body = { message: "Add app verification file (Kairo Code)", content: Buffer.from(JSON.stringify(list.concat(mine), null, 2)).toString("base64") };
   if (sha) body.sha = sha;
   const put = await gh(path, { method: "PUT", body: JSON.stringify(body) });
@@ -64,7 +77,8 @@ module.exports = async function handler(req, res) {
 
   let b = req.body || {};
   if (typeof b === "string") { try { b = JSON.parse(b); } catch (e) { b = {}; } }
-  const { url, name, short, color, packageId, icon, maskable, repo } = b;
+  const { url, name, short, color, packageId, icon, maskable } = b;
+  const repo = b.repo || process.env.SITE_REPO || "";
 
   if (!/^https:\/\/[^\s/]+\/?$/.test(url || "")) return res.status(400).send("Invalid site link");
   if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$/.test(packageId || "")) return res.status(400).send("Invalid package name");
@@ -116,8 +130,8 @@ module.exports = async function handler(req, res) {
     appVersion: "1.0.0.0", appVersionCode: 1,
     host: u.host, startUrl: "/", fullScopeUrl: site + "/", pwaUrl: site + "/",
     webManifestUrl: manifestUrl, iconUrl, maskableIconUrl, monochromeIconUrl: null,
-    themeColor: color, navigationColor: color, navigationColorDark: color,
-    navigationDividerColor: color, navigationDividerColorDark: color,
+    themeColor: color, navigationColor: "#07090d", navigationColorDark: "#07090d",
+    navigationDividerColor: "#07090d", navigationDividerColorDark: "#07090d",
     backgroundColor: "#07090d", display: "standalone", orientation: "default",
     fallbackType: "customtabs", signingMode: "new",
     signing: { file: null, alias: "key", fullName: appName, organization: appName, organizationalUnit: "Dev", countryCode: "US", keyPassword: "", storePassword: "" },
