@@ -361,7 +361,7 @@ html,body{overscroll-behavior:none}
   <input class="input" id="appName" placeholder="App name" maxlength="30">
   <input class="input" id="appShort" placeholder="Short name (max 12 letters)" maxlength="12">
   <input class="input" id="appPackage" placeholder="Package name: com.yourname.app" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="60">
-  <input class="input" id="appRepo" placeholder="Site GitHub repo (optional): owner/repo" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="80">
+  <input class="input" id="appRepo" placeholder="Repo of YOUR site (owner/repo), removes the address bar" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="80">
   <div style="display:flex;gap:12px;align-items:center;margin-bottom:14px">
     <span style="font-size:12px;color:#aeb9ca">App color</span>
     <input type="color" id="appColor" value="#2563eb" style="width:48px;height:38px;border:0;background:none">
@@ -380,7 +380,7 @@ html,body{overscroll-behavior:none}
   </div>
   <div id="linkBox" style="display:none;margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:15px;background:var(--card)">
     <strong style="font-size:13px">One last step: hide the address bar</strong>
-    <p style="font-size:11px;color:#aeb9ca;line-height:1.6;margin:8px 0 10px">Put this file at <b>your-site/.well-known/assetlinks.json</b> (a folder named <b>.well-known</b> at the root of your site's repo), deploy, then uninstall and reinstall the app.</p>
+    <p style="font-size:11px;color:#aeb9ca;line-height:1.6;margin:8px 0 10px">Add this file to your site's GitHub repo, then wait for the site to deploy and reinstall the app. <b>Plain HTML site:</b> <b>.well-known/assetlinks.json</b> at the repo root. <b>Vite / React / Next / Astro / Nuxt site:</b> <b>public/.well-known/assetlinks.json</b>. When it works, this box disappears by itself.</p>
     <textarea class="input" id="linkText" readonly style="height:120px;resize:none;font:11px/1.5 'Courier New',monospace;white-space:pre"></textarea>
     <div style="display:flex;gap:8px">
       <button class="secondary-btn" id="linkCopy" style="flex:1">Copy</button>
@@ -388,7 +388,7 @@ html,body{overscroll-behavior:none}
     </div>
   </div>
 
-  <p style="font-size:11px;color:#8993a3;line-height:1.6;margin-top:10px">The app opens your site in Chrome mode, so Google login works. Enter the GitHub repo of your site and KAIRO CODE adds the verification file for you, which removes the address bar. Your icon is uploaded automatically.</p>
+  <p style="font-size:11px;color:#8993a3;line-height:1.6;margin-top:10px">The app opens your site in Chrome mode, so Google login works. Type the GitHub repo that deploys your site (not the KAIRO CODE repo) and KAIRO CODE adds the verification file for you in the right folder, which removes the address bar. Your icon is uploaded automatically.</p>
 </section>
 
 <!-- LEGAL -->
@@ -1154,6 +1154,38 @@ $("clearIcon").addEventListener("click", () => {
     $("clearIcon").style.display = "none";
 });
 
+/* keeps checking (up to 3 min) that the site really serves the verification file, and explains what to do if not */
+async function watchLive(site, pkg, al, msg, ok){
+    let fps = [];
+    try{ fps = JSON.parse(atob(al)).flatMap(x => (x.target && x.target.package_name === pkg && x.target.sha256_cert_fingerprints) || []); }catch(e){}
+    if(!fps.length) return;
+    const box = $("linkBox");
+    let last = "";
+    for(let i = 0; i < 36; i++){
+        try{
+            const r = await fetch("/api/check?site=" + encodeURIComponent(site) + "&pkg=" + encodeURIComponent(pkg) + "&fp=" + encodeURIComponent(fps.join(",")), { cache:"no-store" });
+            const j = await r.json();
+            if(j.live){
+                box.style.display = "none";
+                msg.textContent = "✓ The verification file is LIVE on your site." + ok;
+                return;
+            }
+            last = j.reason;
+        }catch(e){}
+        msg.textContent = "Your app is ready ✓ Download it now. Waiting for your site to publish the verification file... (" + ((i + 1) * 5) + "s)";
+        await new Promise(r => setTimeout(r, 5000));
+    }
+    box.style.display = "block";
+    const why = {
+        html: "Your site answers with a web page instead of the file. Your site is built with a framework, so the file must be inside the public/ folder: public/.well-known/assetlinks.json.",
+        notfound: "Your site does not have the file yet. Check that the GitHub repo you typed is the repo that deploys THIS site, then add the file below.",
+        old_key: "The file on your site has an older key. Add the new file below (it replaces the old one).",
+        no_package: "The file on your site is for another app package. Add the new file below.",
+        unreachable: "Your site could not be reached."
+    }[last] || "Your site is not serving the file yet.";
+    msg.textContent = "Your app is ready ✓ But the address bar will stay until the site serves the file. " + why + " Use the box below.";
+}
+
 $("appMake").addEventListener("click", async () => {
     const v = appValues();
     const pkg = $("appPackage").value.trim().toLowerCase();
@@ -1200,15 +1232,16 @@ $("appMake").addEventListener("click", async () => {
 
         clearInterval(timer);
         bar.style.width = "100%";
+        const ok = " Now: 1) uninstall the old app, 2) install this one, 3) open it. (If the address bar still shows: Settings > Apps > Chrome > Storage > Clear data, then open the app again.)";
         if(live === "yes"){
-            msg.textContent = "Your app is ready ✓ The verification file is LIVE on your site. Uninstall the old app, install this one, then open it (if the address bar still shows: Settings > Apps > Chrome > Storage > Clear data).";
-        }else if(status === "pushed"){
-            msg.textContent = "Your app is ready, but your site is NOT serving the verification file yet (added to " + note + "). 1) Wait about 1 minute until that site finishes deploying. 2) Uninstall the old app. 3) Install this new one. If the address bar is still there: Settings > Apps > Chrome > Storage > Clear data, then open the app again.";
+            msg.textContent = "Your app is ready ✓ The verification file is LIVE." + ok;
+        }else if(al){
+            try{ $("linkText").value = atob(al); }catch(e){}
+            msg.textContent = "Your app is ready ✓ You can download it now. Checking that your site serves the verification file...";
+            const site = v.url;
+            watchLive(site, pkg, al, msg, ok);
         }else{
-            msg.textContent = "Your app is ready ✓" + (note ? " (auto-add failed: " + note + ")" : " Type the GitHub repo of your site (owner/repo) before generating, so the verification file is added for you.");
-            if(al){
-                try{ $("linkText").value = atob(al); $("linkBox").style.display = "block"; }catch(e){}
-            }
+            msg.textContent = "Your app is ready ✓" + (note ? " (auto-add failed: " + note + ")" : "");
         }
         dl.style.display = "block";
         dl.onclick = () => {
