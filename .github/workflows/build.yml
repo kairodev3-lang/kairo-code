@@ -1,9 +1,22 @@
-# Builds the SYNAPSE AI Android app (APK) in the cloud. File location: .github/workflows/build-android.yml
+h# Builds the SYNAPSE AI Android app (APK) in the cloud. File location: .github/workflows/build-android.yml
 # Run it from GitHub: Actions > Build Android app > Run workflow.
 name: Build Android app
 
 on:
   workflow_dispatch:
+    inputs:
+      site_url:
+        description: "Website link (must start with https://)"
+        required: true
+        default: "https://kairo-gpt.vercel.app"
+      app_name:
+        description: "App name (the name you want under the app icon)"
+        required: true
+        default: "SYNAPSE AI"
+      package_id:
+        description: "Package id (keep com.kairo.synapse for SYNAPSE AI, Google login depends on it)"
+        required: true
+        default: "com.kairo.synapse"
 
 permissions:
   contents: write
@@ -12,6 +25,10 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      SITE_URL: ${{ inputs.site_url }}
+      APP_NAME: ${{ inputs.app_name }}
+      PKG: ${{ inputs.package_id }}
     steps:
       - uses: actions/checkout@v4
 
@@ -57,11 +74,52 @@ jobs:
           {
             echo "## Put these in Firebase (Project settings > Your apps > Android)"
             echo ""
-            echo "Package name: \`com.kairo.synapse\`"
+            echo "Package name: \`$PKG\`"
             echo ""
             echo "SHA-1: \`$SHA1\`"
             echo ""
             echo "SHA-256: \`$SHA256\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set the app name and website link
+        run: |
+          set -e
+          case "$SITE_URL" in
+            https://*) ;;
+            *) echo "::error::The website link must start with https://"; exit 1 ;;
+          esac
+          if ! echo "$PKG" | grep -qE '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'; then
+            echo "::error::Package id is not valid. Use something like com.kairo.synapse (lowercase letters, numbers and dots)."
+            exit 1
+          fi
+          SITE_URL="${SITE_URL%/}"
+          NAME=$(echo "$APP_NAME" | sed -E "s/[<>&\"'\\\\]//g; s/^ +//; s/ +$//")
+          [ -n "$NAME" ] || NAME="SYNAPSE AI"
+          NAME="${NAME:0:30}"
+          HOST=$(echo "$SITE_URL" | sed -E 's#https://([^/]+).*#\1#')
+          case "$SITE_URL" in
+            *\?*) START="$SITE_URL&app=1" ;;
+            *) START="$SITE_URL/?app=1" ;;
+          esac
+          echo "App name: $NAME"
+          echo "Opens: $START"
+          NAME="$NAME" START="$START" HOST="$HOST" node -e '
+            const fs = require("fs"), p = "android-app/capacitor.config.json";
+            const c = JSON.parse(fs.readFileSync(p, "utf8"));
+            c.appName = process.env.NAME;
+            c.appId = process.env.PKG;
+            c.server.url = process.env.START;
+            c.server.allowNavigation = [process.env.HOST];
+            fs.writeFileSync(p, JSON.stringify(c, null, 2));
+            const h = "android-app/www/index.html";
+            fs.writeFileSync(h, fs.readFileSync(h, "utf8").split("https://kairo-gpt.vercel.app/?app=1").join(process.env.START));
+          '
+          {
+            echo "## App"
+            echo ""
+            echo "Name: **$NAME**"
+            echo ""
+            echo "Opens: $START"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install
@@ -86,11 +144,35 @@ jobs:
           sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#&\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />#' "$MANIFEST"
           grep -n "uses-permission" "$MANIFEST"
 
-      - name: App icon (only if android-app/assets/icon-only.png exists)
-        if: hashFiles('android-app/assets/icon-only.png') != ''
+      - name: App icon (sharp, made from your logo)
         continue-on-error: true
-        working-directory: android-app
-        run: npx --yes @capacitor/assets generate --android --iconBackgroundColor '#0b1226' --iconBackgroundColorDark '#0b1226'
+        run: |
+          # 1) best: your own 1024x1024 PNG at android-app/assets/icon-only.png
+          # 2) else icon-1024 / icon-512 / icon-192 from the repo, 3) else from the website
+          SRC=""
+          for f in android-app/assets/icon-only.png icon-1024.png icon-512.png icon-192.png; do
+            if [ -f "$f" ]; then SRC="$f"; break; fi
+          done
+          if [ -z "$SRC" ]; then
+            for n in icon-1024.png icon-512.png icon-192.png; do
+              if curl -fsSL --max-time 20 "${SITE_URL%/}/$n" -o /tmp/site-icon.png; then SRC=/tmp/site-icon.png; break; fi
+            done
+          fi
+          if [ -z "$SRC" ]; then
+            echo "::warning::No logo found, the default icon is used. Add a 1024x1024 PNG at android-app/assets/icon-only.png"
+            exit 0
+          fi
+          IM=$(command -v convert || command -v magick)
+          echo "Logo source: $SRC ($(identify "$SRC" | awk '{print $3}'))"
+          mkdir -p android-app/assets
+          # square, 1024 px, sharpened
+          "$IM" "$SRC" -background none -gravity center -filter Lanczos -resize 1024x1024 -extent 1024x1024 -unsharp 0x0.8 /tmp/logo1024.png
+          cp /tmp/logo1024.png android-app/assets/icon-only.png
+          # adaptive icon: big logo in the safe zone, on a dark tile
+          "$IM" -size 1024x1024 xc:none \( /tmp/logo1024.png -resize 760x760 \) -gravity center -composite android-app/assets/icon-foreground.png
+          "$IM" -size 1024x1024 xc:'#0b1226' android-app/assets/icon-background.png
+          cd android-app
+          npx --yes @capacitor/assets generate --android
 
       - name: Sync
         working-directory: android-app
