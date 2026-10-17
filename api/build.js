@@ -2,6 +2,8 @@ const { gh } = require("./_gh");
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  if (!process.env.GH_TOKEN && !process.env.GITHUB_TOKEN && !process.env.GITHUB_PAT && !process.env.GITHUB_ACCESS_TOKEN && !process.env.GIT_TOKEN)
+    return res.status(500).json({ error: "No GitHub token found in Vercel variables" });
   try {
     const b = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
     const { url, packageName, appName, icon } = b;
