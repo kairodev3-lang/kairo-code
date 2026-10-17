@@ -1,0 +1,122 @@
+name: Build APK
+run-name: APK build ${{ inputs.build_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        required: true
+      url:
+        required: true
+      package:
+        required: true
+      app_name:
+        required: true
+      icon_b64:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli
+
+      - name: Prepare project files
+        env:
+          SITE_URL: ${{ inputs.url }}
+          PKG: ${{ inputs.package }}
+          APP_NAME: ${{ inputs.app_name }}
+          ICON_B64: ${{ inputs.icon_b64 }}
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD || 'kairo-temp-pass' }}
+        run: |
+          mkdir app && cd app
+          echo "$ICON_B64" | base64 -d > icon_src
+          convert icon_src -resize 512x512 icon.png
+
+          cat > gen.js << 'JS'
+          const u = new URL(process.env.SITE_URL);
+          if (u.protocol !== "https:") throw new Error("HTTPS only");
+          if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(process.env.PKG)) throw new Error("Bad package");
+          const name = process.env.APP_NAME.slice(0, 30);
+          const dark = "#07090d";
+          const m = {
+            packageId: process.env.PKG,
+            host: u.host,
+            name: name,
+            launcherName: name.slice(0, 15),
+            display: "standalone",
+            themeColor: dark, themeColorDark: dark,
+            navigationColor: dark, navigationColorDark: dark,
+            navigationDividerColor: dark, navigationDividerColorDark: dark,
+            backgroundColor: dark,
+            enableNotifications: false,
+            startUrl: u.pathname + u.search,
+            iconUrl: "http://localhost:8099/icon.png",
+            maskableIconUrl: "http://localhost:8099/icon.png",
+            appVersion: "1", appVersionName: "1.0.0", appVersionCode: 1,
+            signingKey: { path: "./android.keystore", alias: "android" },
+            splashScreenFadeOutDuration: 300,
+            fallbackType: "customtabs",
+            enableSiteSettingsShortcut: true,
+            isChromeOSOnly: false,
+            isMetaQuest: false,
+            orientation: "default",
+            minSdkVersion: 21,
+            shortcuts: [],
+            features: {},
+            alphaDependencies: { enabled: false },
+            generatorApp: "bubblewrap-cli"
+          };
+          require("fs").writeFileSync("twa-manifest.json", JSON.stringify(m, null, 2));
+          JS
+          node gen.js
+
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > android.keystore
+          else
+            keytool -genkeypair -keystore android.keystore -alias android -keyalg RSA -keysize 2048 \
+              -validity 10000 -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=Kairo, O=Kairo, C=US"
+          fi
+
+      - name: Configure Bubblewrap and Android SDK
+        run: |
+          mkdir -p ~/.bubblewrap
+          echo "{\"jdkPath\":\"$JAVA_HOME\",\"androidSdkPath\":\"$ANDROID_HOME\"}" > ~/.bubblewrap/config.json
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Build APK
+        working-directory: app
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'kairo-temp-pass' }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'kairo-temp-pass' }}
+        run: |
+          python3 -m http.server 8099 > /dev/null 2>&1 &
+          sleep 2
+          bubblewrap update --skipVersionUpgrade
+          bubblewrap build --skipPwaValidation
+
+      - name: Show signing fingerprint (for assetlinks.json)
+        working-directory: app
+        env:
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD || 'kairo-temp-pass' }}
+        run: |
+          echo "### SHA-256 fingerprint" >> "$GITHUB_STEP_SUMMARY"
+          keytool -list -v -keystore android.keystore -alias android -storepass "$KS_PASS" | grep "SHA256" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ inputs.build_id }}
+          path: app/app-release-signed.apk
+          retention-days: 1
