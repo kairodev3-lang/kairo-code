@@ -29,8 +29,11 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install Bubblewrap
-        run: npm install -g @bubblewrap/cli
+      - name: Install Bubblewrap and ImageMagick
+        run: |
+          npm install -g @bubblewrap/cli
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq imagemagick
 
       - name: Prepare project files
         env:
