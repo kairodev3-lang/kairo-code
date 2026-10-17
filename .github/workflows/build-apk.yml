@@ -76,7 +76,7 @@ jobs:
             isChromeOSOnly: false,
             isMetaQuest: false,
             orientation: "default",
-            minSdkVersion: 21,
+            minSdkVersion: 24,
             shortcuts: [],
             features: {},
             alphaDependencies: { enabled: false },
