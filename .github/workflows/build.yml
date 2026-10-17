@@ -1,212 +1,122 @@
-# Builds the SYNAPSE AI Android app (APK) in the cloud. File location: .github/workflows/build-android.yml
-# Run it from GitHub: Actions > Build Android app > Run workflow.
-name: Build Android app
+name: Build APK
+run-name: APK build ${{ inputs.build_id }}
 
 on:
   workflow_dispatch:
     inputs:
-      site_url:
-        description: "Website link (must start with https://)"
+      build_id:
         required: true
-        default: "https://kairo-gpt.vercel.app"
+      url:
+        required: true
+      package:
+        required: true
       app_name:
-        description: "App name (the name you want under the app icon)"
         required: true
-        default: "SYNAPSE AI"
-      package_id:
-        description: "Package id (keep com.kairo.synapse for SYNAPSE AI, Google login depends on it)"
+      icon_b64:
         required: true
-        default: "com.kairo.synapse"
-
-permissions:
-  contents: write
 
 jobs:
-  apk:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      SITE_URL: ${{ inputs.site_url }}
-      APP_NAME: ${{ inputs.app_name }}
-      PKG: ${{ inputs.package_id }}
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Check the Android files
-        run: |
-          if [ ! -f android-app/package.json ] || [ ! -f android-app/capacitor.config.json ]; then
-            echo "::error::android-app/package.json or android-app/capacitor.config.json is missing. Add them from the kairo-code zip."
-            exit 1
-          fi
-          mkdir -p android-app/www
-          [ -f android-app/www/index.html ] || printf '<!DOCTYPE html><html><body>SYNAPSE AI</body></html>' > android-app/www/index.html
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: "17"
 
-      - name: Signing key (made once, then reused so Google login keeps working)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Bubblewrap
+        run: npm install -g @bubblewrap/cli
+
+      - name: Prepare project files
+        env:
+          SITE_URL: ${{ inputs.url }}
+          PKG: ${{ inputs.package }}
+          APP_NAME: ${{ inputs.app_name }}
+          ICON_B64: ${{ inputs.icon_b64 }}
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD || 'kairo-temp-pass' }}
         run: |
-          set -e
-          if [ ! -f android-app/synapse-debug.keystore ]; then
-            keytool -genkeypair -keystore android-app/synapse-debug.keystore -storepass android -keypass android \
-              -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=SYNAPSE AI, O=KAIRO, C=HT"
-          fi
-          mkdir -p ~/.android
-          cp android-app/synapse-debug.keystore ~/.android/debug.keystore
-          # keep the key and the Android folder away from the public website
-          touch .vercelignore
-          grep -qx 'android-app' .vercelignore || echo 'android-app' >> .vercelignore
-          grep -qx '.github' .vercelignore || echo '.github' >> .vercelignore
-          git config user.name "github-actions"
-          git config user.email "actions@users.noreply.github.com"
-          git add -f android-app/synapse-debug.keystore .vercelignore
-          git diff --cached --quiet || { git commit -m "Android signing key"; git pull --rebase; git push; }
-          KEYINFO=$(keytool -list -v -keystore android-app/synapse-debug.keystore -storepass android)
-          SHA1=$(echo "$KEYINFO" | awk '/SHA1:/ {print $2; exit}')
-          SHA256=$(echo "$KEYINFO" | awk '/SHA256:/ {print $2; exit}')
-          {
-            echo "## Put these in Firebase (Project settings > Your apps > Android)"
-            echo ""
-            echo "Package name: \`$PKG\`"
-            echo ""
-            echo "SHA-1: \`$SHA1\`"
-            echo ""
-            echo "SHA-256: \`$SHA256\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          mkdir app && cd app
+          echo "$ICON_B64" | base64 -d > icon_src
+          convert icon_src -resize 512x512 icon.png
 
-      - name: Set the app name and website link
-        run: |
-          set -e
-          case "$SITE_URL" in
-            https://*) ;;
-            *) echo "::error::The website link must start with https://"; exit 1 ;;
-          esac
-          if ! echo "$PKG" | grep -qE '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'; then
-            echo "::error::Package id is not valid. Use something like com.kairo.synapse (lowercase letters, numbers and dots)."
-            exit 1
-          fi
-          SITE_URL="${SITE_URL%/}"
-          NAME=$(echo "$APP_NAME" | sed -E "s/[<>&\"'\\\\]//g; s/^ +//; s/ +$//")
-          [ -n "$NAME" ] || NAME="SYNAPSE AI"
-          NAME="${NAME:0:30}"
-          HOST=$(echo "$SITE_URL" | sed -E 's#https://([^/]+).*#\1#')
-          case "$SITE_URL" in
-            *\?*) START="$SITE_URL&app=1" ;;
-            *) START="$SITE_URL/?app=1" ;;
-          esac
-          echo "App name: $NAME"
-          echo "Opens: $START"
-          NAME="$NAME" START="$START" HOST="$HOST" node -e '
-            const fs = require("fs"), p = "android-app/capacitor.config.json";
-            const c = JSON.parse(fs.readFileSync(p, "utf8"));
-            c.appName = process.env.NAME;
-            c.appId = process.env.PKG;
-            c.server.url = process.env.START;
-            c.server.allowNavigation = [process.env.HOST];
-            fs.writeFileSync(p, JSON.stringify(c, null, 2));
-            const h = "android-app/www/index.html";
-            fs.writeFileSync(h, fs.readFileSync(h, "utf8").split("https://kairo-gpt.vercel.app/?app=1").join(process.env.START));
-          '
-          {
-            echo "## App"
-            echo ""
-            echo "Name: **$NAME**"
-            echo ""
-            echo "Opens: $START"
-          } >> "$GITHUB_STEP_SUMMARY"
+          cat > gen.js << 'JS'
+          const u = new URL(process.env.SITE_URL);
+          if (u.protocol !== "https:") throw new Error("HTTPS only");
+          if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(process.env.PKG)) throw new Error("Bad package");
+          const name = process.env.APP_NAME.slice(0, 30);
+          const dark = "#07090d";
+          const m = {
+            packageId: process.env.PKG,
+            host: u.host,
+            name: name,
+            launcherName: name.slice(0, 15),
+            display: "standalone",
+            themeColor: dark, themeColorDark: dark,
+            navigationColor: dark, navigationColorDark: dark,
+            navigationDividerColor: dark, navigationDividerColorDark: dark,
+            backgroundColor: dark,
+            enableNotifications: false,
+            startUrl: u.pathname + u.search,
+            iconUrl: "http://localhost:8099/icon.png",
+            maskableIconUrl: "http://localhost:8099/icon.png",
+            appVersion: "1", appVersionName: "1.0.0", appVersionCode: 1,
+            signingKey: { path: "./android.keystore", alias: "android" },
+            splashScreenFadeOutDuration: 300,
+            fallbackType: "customtabs",
+            enableSiteSettingsShortcut: true,
+            isChromeOSOnly: false,
+            isMetaQuest: false,
+            orientation: "default",
+            minSdkVersion: 21,
+            shortcuts: [],
+            features: {},
+            alphaDependencies: { enabled: false },
+            generatorApp: "bubblewrap-cli"
+          };
+          require("fs").writeFileSync("twa-manifest.json", JSON.stringify(m, null, 2));
+          JS
+          node gen.js
 
-      - name: Install
-        working-directory: android-app
-        run: npm install --legacy-peer-deps
-
-      - name: Create the Android project
-        working-directory: android-app
-        run: npx cap add android
-
-      - name: Firebase file and permissions
-        run: |
-          if [ -f android-app/google-services.json ]; then
-            cp android-app/google-services.json android-app/android/app/google-services.json
-            echo "google-services.json found"
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > android.keystore
           else
-            echo "::warning::android-app/google-services.json is missing. The app will build, but Google login will not work yet."
-            mkdir -p android-app/android/app/src/main/res/values
-            printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="default_web_client_id" translatable="false">missing-google-services-json</string>\n</resources>\n' > android-app/android/app/src/main/res/values/synapse_placeholder.xml
+            keytool -genkeypair -keystore android.keystore -alias android -keyalg RSA -keysize 2048 \
+              -validity 10000 -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=Kairo, O=Kairo, C=US"
           fi
-          MANIFEST=android-app/android/app/src/main/AndroidManifest.xml
-          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#&\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />#' "$MANIFEST"
-          grep -n "uses-permission" "$MANIFEST"
 
-      - name: App icon (sharp, made from your logo)
-        continue-on-error: true
+      - name: Configure Bubblewrap and Android SDK
         run: |
-          # 1) best: your own 1024x1024 PNG at android-app/assets/icon-only.png
-          # 2) else icon-1024 / icon-512 / icon-192 from the repo, 3) else from the website
-          SRC=""
-          for f in android-app/assets/icon-only.png icon-1024.png icon-512.png icon-192.png; do
-            if [ -f "$f" ]; then SRC="$f"; break; fi
-          done
-          if [ -z "$SRC" ]; then
-            for n in icon-1024.png icon-512.png icon-192.png; do
-              if curl -fsSL --max-time 20 "${SITE_URL%/}/$n" -o /tmp/site-icon.png; then SRC=/tmp/site-icon.png; break; fi
-            done
-          fi
-          if [ -z "$SRC" ]; then
-            echo "::warning::No logo found, the default icon is used. Add a 1024x1024 PNG at android-app/assets/icon-only.png"
-            exit 0
-          fi
-          IM=$(command -v convert || command -v magick)
-          echo "Logo source: $SRC ($(identify "$SRC" | awk '{print $3}'))"
-          mkdir -p android-app/assets
-          # square, 1024 px, sharpened
-          "$IM" "$SRC" -background none -gravity center -filter Lanczos -resize 1024x1024 -extent 1024x1024 -unsharp 0x0.8 /tmp/logo1024.png
-          cp /tmp/logo1024.png android-app/assets/icon-only.png
-          # adaptive icon: big logo in the safe zone, on a dark tile
-          "$IM" -size 1024x1024 xc:none \( /tmp/logo1024.png -resize 760x760 \) -gravity center -composite android-app/assets/icon-foreground.png
-          "$IM" -size 1024x1024 xc:'#0b1226' android-app/assets/icon-background.png
-          cd android-app
-          npx --yes @capacitor/assets generate --android || echo "::warning::The icon tool failed, so the default icon is used."
-          COUNT=$(ls android/app/src/main/res/mipmap-*/ic_launcher*.png 2>/dev/null | wc -l)
-          {
-            echo "## Icon"
-            echo ""
-            echo "Logo used: \`$SRC\` ($(identify /tmp/logo1024.png | awk '{print $3}') after resize)"
-            echo ""
-            echo "Icon files made: $COUNT"
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$COUNT" -eq 0 ]; then echo "::warning::No icon files were made, so the default icon is used."; fi
+          mkdir -p ~/.bubblewrap
+          echo "{\"jdkPath\":\"$JAVA_HOME\",\"androidSdkPath\":\"$ANDROID_HOME\"}" > ~/.bubblewrap/config.json
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
-      - name: Sync
-        working-directory: android-app
-        run: npx cap sync android
-
-      - name: Accept Android licenses
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-
-      - name: Build the APK
-        working-directory: android-app/android
+      - name: Build APK
+        working-directory: app
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'kairo-temp-pass' }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'kairo-temp-pass' }}
         run: |
-          chmod +x gradlew
-          mkdir -p ~/.gradle
-          echo "org.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8" >> ~/.gradle/gradle.properties
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          python3 -m http.server 8099 > /dev/null 2>&1 &
+          sleep 2
+          bubblewrap update --skipVersionUpgrade
+          bubblewrap build --skipPwaValidation
 
-      - name: Name the file
-        run: cp android-app/android/app/build/outputs/apk/debug/app-debug.apk synapse-ai-2.apk
+      - name: Show signing fingerprint (for assetlinks.json)
+        working-directory: app
+        env:
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD || 'kairo-temp-pass' }}
+        run: |
+          echo "### SHA-256 fingerprint" >> "$GITHUB_STEP_SUMMARY"
+          keytool -list -v -keystore android.keystore -alias android -storepass "$KS_PASS" | grep "SHA256" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SYNAPSE-AI-apk
-          path: synapse-ai-2.apk
-
-      - name: Put the APK on the website (the download banner uses it)
-        run: |
-          git add -f synapse-ai-2.apk
-          git diff --cached --quiet || { git commit -m "New Android app build"; git pull --rebase; git push; }
+          name: apk-${{ inputs.build_id }}
+          path: app/app-release-signed.apk
+          retention-days: 1
