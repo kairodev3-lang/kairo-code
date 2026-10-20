@@ -152,6 +152,9 @@ button{cursor:pointer}
 .apk-dl{display:none;margin-top:18px;text-align:center}
 .apk-dl a{display:block;padding:14px;border-radius:13px;background:var(--green);color:#04210f;font-weight:900;text-decoration:none}
 .apk-dl a.off{background:#2a3140;color:#7d8798;pointer-events:none}
+.apk-links{display:none;margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
+.al-title{font-weight:800;font-size:14px}
+.al-row{display:flex;gap:8px;margin-top:10px}
 .timer{font-size:28px;font-weight:900;margin:8px 0}
 /* RESPONSIVE */
 @media(min-width:800px){
@@ -299,6 +302,13 @@ button{cursor:pointer}
         <div style="font-size:12px;color:var(--muted)">Your app is ready. Download before time runs out:</div>
         <div class="timer" id="apkTimer">1:30</div>
         <a href="#" id="apkLink" download>Download APK</a>
+      </div>
+      <div class="apk-links" id="apkLinks">
+        <div class="al-title">Hide the address bar</div>
+        <p class="apk-note">Add this file to your site at <b id="alPath"></b>, then reinstall the app.</p>
+        <textarea class="input" id="alText" rows="6" readonly style="font-family:monospace;font-size:11px;margin-top:8px"></textarea>
+        <div class="al-row"><button class="pick" id="alCopy">Copy</button><button class="pick" id="alCheck">Check my site</button></div>
+        <div class="apk-note" id="alResult"></div>
       </div>
       <p class="apk-note">Building takes a few minutes. When it finishes, you have 1 minute 30 seconds to download the file. Then the link expires.</p>
     </div>
@@ -836,6 +846,7 @@ $("apkGen").addEventListener("click",async()=>{
   if(!payload) return;
   $("apkGen").disabled = true;
   $("apkDl").style.display = "none";
+  $("apkLinks").style.display = "none";
   $("apkStatus").style.display = "block";
   $("apkBar").style.width = "5%";
   $("apkStatusText").textContent = "Sending request…";
@@ -856,6 +867,7 @@ $("apkGen").addEventListener("click",async()=>{
         if(s.status==="done"){
           $("apkBar").style.width = "100%";
           $("apkStatusText").textContent = "Done ✓";
+          showAssetLinks(d.id,payload);
           return apkDownloadWindow(s.downloadUrl,payload.appName);
         }
         if(s.status==="failed") return fail("Build failed. Check the Actions tab in your repo.");
@@ -868,6 +880,33 @@ $("apkGen").addEventListener("click",async()=>{
     };
     poll();
   }catch(e){ fail(e.message); }
+});
+
+let alData = null;
+async function showAssetLinks(id,payload){
+  try{
+    const r = await fetch(BUILD_API+"/assetlinks?id="+id);
+    if(!r.ok) return;
+    const j = JSON.parse(await r.text());
+    alData = {url:payload.url, pkg:payload.packageName, fp:j[0].target.sha256_cert_fingerprints[0]};
+    $("alText").value = JSON.stringify(j,null,2);
+    $("alPath").textContent = new URL(payload.url).origin+"/.well-known/assetlinks.json";
+    $("apkLinks").style.display = "block";
+  }catch(e){}
+}
+$("alCopy").addEventListener("click",async()=>{
+  try{ await navigator.clipboard.writeText($("alText").value); }
+  catch(e){ $("alText").select(); document.execCommand("copy"); }
+  showToast("Copied");
+});
+$("alCheck").addEventListener("click",async()=>{
+  if(!alData) return;
+  $("alResult").textContent = "Checking…";
+  try{
+    const r = await fetch(BUILD_API+"/verify?url="+encodeURIComponent(alData.url)+"&pkg="+encodeURIComponent(alData.pkg)+"&fp="+encodeURIComponent(alData.fp));
+    const d = await r.json();
+    $("alResult").textContent = d.ok ? "✓ Verified. Reinstall the app and the bar will be gone." : "✗ "+d.reason;
+  }catch(e){ $("alResult").textContent = "✗ Check failed"; }
 });
 
 function apkDownloadWindow(link,appName){
