@@ -27,4 +27,19 @@ async function findRun(id) {
   return (j.workflow_runs || []).find(x => x.display_title && x.display_title.includes(id));
 }
 
-module.exports = { H, gh, findRun };
+// downloads the build artifact (zip) for a build id
+async function getArtifactZip(id) {
+  const AdmZip = require("adm-zip");
+  const run = await findRun(id);
+  if (!run || run.conclusion !== "success") return null;
+  const a = await (await gh(`/actions/runs/${run.id}/artifacts`)).json();
+  const art = (a.artifacts || []).find(x => x.name === "apk-" + id);
+  if (!art) return null;
+  const z = await fetch(art.archive_download_url, { headers: H, redirect: "manual" });
+  const loc = z.headers.get("location");
+  if (!loc) return null;
+  const buf = Buffer.from(await (await fetch(loc)).arrayBuffer());
+  return { zip: new AdmZip(buf), run };
+}
+
+module.exports = { H, gh, findRun, getArtifactZip };
