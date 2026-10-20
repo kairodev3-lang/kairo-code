@@ -19,7 +19,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    permissions:
+      contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -42,6 +46,7 @@ jobs:
           APP_NAME: ${{ inputs.app_name }}
           ICON_B64: ${{ inputs.icon_b64 }}
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KS_SECRET: ${{ secrets.KEYSTORE_PASSWORD }}
           KS_PASS: ${{ secrets.KEYSTORE_PASSWORD || 'kairo-temp-pass' }}
         run: |
           mkdir app && cd app
@@ -86,10 +91,30 @@ jobs:
           JS
           node gen.js
 
+          KS_FILE=".github/keystore/keystore.enc"
+          cd "$GITHUB_WORKSPACE"
           if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > android.keystore
+            echo "$KEYSTORE_B64" | base64 -d > app/android.keystore
+          elif [ -n "$KS_SECRET" ]; then
+            if [ -f "$KS_FILE" ]; then
+              echo "Reusing saved signing key"
+              openssl enc -d -aes-256-cbc -pbkdf2 -pass env:KS_SECRET -in "$KS_FILE" -out app/android.keystore
+            else
+              echo "Creating a new signing key (first build)"
+              keytool -genkeypair -keystore app/android.keystore -alias android -keyalg RSA -keysize 2048 \
+                -validity 10000 -storepass "$KS_SECRET" -keypass "$KS_SECRET" -dname "CN=Kairo, O=Kairo, C=US"
+              mkdir -p .github/keystore
+              openssl enc -aes-256-cbc -pbkdf2 -pass env:KS_SECRET -in app/android.keystore -out "$KS_FILE"
+              git config user.name "kairo-bot"
+              git config user.email "kairo-bot@users.noreply.github.com"
+              git add "$KS_FILE"
+              git commit -m "Save encrypted signing key"
+              git pull --rebase origin "${GITHUB_REF_NAME}" || true
+              git push origin "HEAD:${GITHUB_REF_NAME}"
+            fi
           else
-            keytool -genkeypair -keystore android.keystore -alias android -keyalg RSA -keysize 2048 \
+            echo "WARNING: KEYSTORE_PASSWORD secret not set. Using a temporary key. The key will change every build."
+            keytool -genkeypair -keystore app/android.keystore -alias android -keyalg RSA -keysize 2048 \
               -validity 10000 -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=Kairo, O=Kairo, C=US"
           fi
 
@@ -122,16 +147,31 @@ jobs:
           bubblewrap update --skipVersionUpgrade
           bubblewrap build --skipPwaValidation
 
-      - name: Show signing fingerprint (for assetlinks.json)
+      - name: Show assetlinks.json to copy
         working-directory: app
         env:
           KS_PASS: ${{ secrets.KEYSTORE_PASSWORD || 'kairo-temp-pass' }}
+          PKG: ${{ inputs.package }}
+          SITE_URL: ${{ inputs.url }}
         run: |
-          echo "### SHA-256 fingerprint" >> "$GITHUB_STEP_SUMMARY"
-          keytool -list -v -keystore android.keystore -alias android -storepass "$KS_PASS" | grep "SHA256" >> "$GITHUB_STEP_SUMMARY"
+          FP=$(keytool -list -v -keystore android.keystore -alias android -storepass "$KS_PASS" | grep "SHA256" | head -1 | awk '{print $2}')
+          JSON="[{\"relation\":[\"delegate_permission/common.handle_all_urls\"],\"target\":{\"namespace\":\"android_app\",\"package_name\":\"$PKG\",\"sha256_cert_fingerprints\":[\"$FP\"]}}]"
+          echo "$JSON" > assetlinks.json
+          {
+            echo "### SHA-256 fingerprint"
+            echo '```'
+            echo "$FP"
+            echo '```'
+            echo "### Put this at /.well-known/assetlinks.json on $SITE_URL"
+            echo '```json'
+            echo "$JSON"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:
           name: apk-${{ inputs.build_id }}
-          path: app/app-release-signed.apk
+          path: |
+            app/app-release-signed.apk
+            app/assetlinks.json
           retention-days: 1
